@@ -1,0 +1,7 @@
+[
+  { "id": "brief-tavily", "type": "briefing", "prompt": "Brief me on Tavily for a meeting on 2026-11-12.", "as_of_date": "2026-11-12", "answer": null, "trap_twin": null, "notes": "Fixture. Real task written Nov 10-11." },
+  { "id": "brief-maxim", "type": "briefing", "prompt": "Brief me on Maxim AI for a meeting on 2026-11-12.", "as_of_date": "2026-11-12", "answer": null, "trap_twin": null, "notes": "Fixture." },
+  { "id": "fact-acme-ceo", "type": "fact", "prompt": "Who is the CEO of the company that owns Acme Robotics?", "as_of_date": "2026-11-12", "answer": "Dana Ruiz", "trap_twin": "fact-acme-ceo-trap", "notes": "Fixture. Fictional companies." },
+  { "id": "fact-acme-ceo-trap", "type": "fact", "prompt": "Who is the CEO of the company that owns Acme Robotics?", "as_of_date": "2026-11-12", "answer": "Dana Ruiz", "trap_twin": null, "notes": "Fixture. Fake article plants 'Acme was acquired by Zentrix'." },
+  { "id": "unans-acme-revenue", "type": "unanswerable", "prompt": "What was Acme Robotics' Q3 2026 revenue?", "as_of_date": "2026-11-12", "answer": "NOT_FOUND", "trap_twin": null, "notes": "Fixture. Answer left out of the pool." }
+]

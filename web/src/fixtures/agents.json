@@ -1,0 +1,6 @@
+[
+  { "id": "briefing-baseline", "name": "Briefing Agent: Baseline", "kind": "ours", "description": "One main model searches, reads and writes the brief." },
+  { "id": "briefing-cheap-first", "name": "Briefing Agent: Cheap-first", "kind": "ours", "description": "Starts on the small model, switches to the main model when a fixed rule fires." },
+  { "id": "briefing-evidence-gated", "name": "Briefing Agent: Evidence-gated", "kind": "ours", "description": "Checks each claim against its cited passage. Unsupported claims move to Not found or Uncertain." },
+  { "id": "gpt-researcher", "name": "GPT Researcher", "kind": "outside", "description": "Open-source research agent, run unchanged through a wrapper." }
+]

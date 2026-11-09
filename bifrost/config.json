@@ -1,0 +1,20 @@
+{
+  "$schema": "https://www.getbifrost.ai/schema",
+  "providers": {
+    "groq": {
+      "keys": [{ "name": "groq-1", "value": "env.GROQ_API_KEY", "models": ["*"], "weight": 1.0 }]
+    },
+    "openrouter": {
+      "keys": [{ "name": "openrouter-1", "value": "env.OPENROUTER_API_KEY", "models": ["*"], "weight": 1.0 }]
+    },
+    "gemini": {
+      "keys": [{ "name": "gemini-1", "value": "env.GEMINI_API_KEY", "models": ["*"], "weight": 1.0 }]
+    },
+    "cerebras": {
+      "keys": [{ "name": "cerebras-1", "value": "env.CEREBRAS_API_KEY", "models": ["*"], "weight": 1.0 }]
+    },
+    "openai": {
+      "keys": [{ "name": "openai-judge", "value": "env.OPENAI_API_KEY", "models": ["*"], "weight": 1.0 }]
+    }
+  }
+}
