@@ -1,0 +1,7 @@
+.env
+.git
+**/node_modules
+**/.venv
+**/dist
+**/__pycache__
+bifrost
