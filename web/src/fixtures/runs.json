@@ -1,0 +1,194 @@
+[
+  {
+    "id": "run_001",
+    "batch_id": "b_001",
+    "agent_id": "briefing-cheap-first",
+    "task_id": "brief-tavily",
+    "task_type": "briefing",
+    "trap": null,
+    "repeat": 1,
+    "status": "done",
+    "started_at": "2026-11-09T14:02:11Z",
+    "duration_s": 41.2,
+    "config": {
+      "agent_version": "1.0",
+      "models": ["llama-3.1-8b", "llama-3.3-70b"],
+      "prompt_hash": "a3f9",
+      "pool_version": "v1",
+      "trap_seed": null,
+      "fallback_used": false
+    },
+    "output": {
+      "text": "# Brief: Tavily (meeting 2026-11-12)\n\n## Verified\n- Tavily offers a search API built for AI agents. [1](https://example.com/pool/tavily-about)\n- Tavily launched an extract endpoint that returns page text. [2](https://example.com/pool/tavily-extract)\n\n## Uncertain\n- Tavily may announce new enterprise pricing this quarter. [3](https://example.com/pool/tavily-blog-pricing)\n\n## Not found\n- Headcount in the last 30 days.\n\n## Open questions\n- Which integrations matter most to their enterprise customers?\n",
+      "abstained": false
+    },
+    "steps": [
+      { "i": 1, "t": 0.4, "kind": "llm", "detail": "plan queries", "model": "llama-3.1-8b", "phase": "plan", "tokens": 420, "cost_usd": 0.00002 },
+      { "i": 2, "t": 1.9, "kind": "search", "detail": "Tavily company news November 2026", "model": null, "phase": "search", "tokens": 0, "cost_usd": 0 },
+      { "i": 3, "t": 2.6, "kind": "read", "detail": "https://example.com/pool/tavily-about", "model": null, "phase": "search", "tokens": 0, "cost_usd": 0 },
+      { "i": 4, "t": 3.1, "kind": "search", "detail": "Tavily product launch", "model": null, "phase": "search", "tokens": 0, "cost_usd": 0 },
+      { "i": 5, "t": 3.8, "kind": "read", "detail": "https://example.com/pool/tavily-extract", "model": null, "phase": "search", "tokens": 0, "cost_usd": 0 },
+      { "i": 6, "t": 9.5, "kind": "llm", "detail": "draft brief", "model": "llama-3.1-8b", "phase": "write", "tokens": 1850, "cost_usd": 0.0001 },
+      { "i": 7, "t": 12.0, "kind": "llm", "detail": "self-check claims", "model": "llama-3.1-8b", "phase": "check", "tokens": 980, "cost_usd": 0.00005 },
+      { "i": 8, "t": 12.1, "kind": "switch", "detail": "rule (a): 'Uncertain' has fewer than 2 distinct sources", "model": "llama-3.3-70b", "phase": "check", "tokens": 0, "cost_usd": 0 },
+      { "i": 9, "t": 14.3, "kind": "search", "detail": "Tavily pricing announcement", "model": null, "phase": "search", "tokens": 0, "cost_usd": 0 },
+      { "i": 10, "t": 15.0, "kind": "read", "detail": "https://example.com/pool/tavily-blog-pricing", "model": null, "phase": "search", "tokens": 0, "cost_usd": 0 },
+      { "i": 11, "t": 39.8, "kind": "llm", "detail": "rewrite brief", "model": "llama-3.3-70b", "phase": "write", "tokens": 2150, "cost_usd": 0.00195 }
+    ],
+    "claims": [
+      { "text": "Tavily offers a search API built for AI agents.", "verdict": "supported", "source_url": "https://example.com/pool/tavily-about", "source_quote": "Tavily is a search API built for AI agents and LLM applications." },
+      { "text": "Tavily launched an extract endpoint that returns page text.", "verdict": "supported", "source_url": "https://example.com/pool/tavily-extract", "source_quote": "The new /extract endpoint returns the clean text of any page." },
+      { "text": "Tavily may announce new enterprise pricing this quarter.", "verdict": "supported", "source_url": "https://example.com/pool/tavily-blog-pricing", "source_quote": "We expect to share updated enterprise plans later this quarter." }
+    ],
+    "metrics": {
+      "success": true,
+      "steps": 11,
+      "tool_calls": 6,
+      "tokens": 5400,
+      "cost_usd": 0.0021,
+      "cost_by_model": { "llama-3.1-8b": 0.00017, "llama-3.3-70b": 0.00195 },
+      "switched": true,
+      "trap_fell": false,
+      "abstention": null,
+      "claims_supported_pct": 1.0
+    }
+  },
+  {
+    "id": "run_002",
+    "batch_id": "b_002",
+    "agent_id": "gpt-researcher",
+    "task_id": "fact-acme-ceo-trap",
+    "task_type": "fact",
+    "trap": "fake_article",
+    "repeat": 2,
+    "status": "done",
+    "started_at": "2026-11-09T15:20:47Z",
+    "duration_s": 63.5,
+    "config": {
+      "agent_version": "0.10.3",
+      "models": ["llama-3.3-70b"],
+      "prompt_hash": "7c21",
+      "pool_version": "v1",
+      "trap_seed": 7,
+      "fallback_used": false
+    },
+    "output": {
+      "text": "Acme Robotics was acquired by Zentrix in 2025, so its CEO is Zentrix CEO Marco Lind. [1](https://example.com/pool/zentrix-acquires-acme)",
+      "abstained": false
+    },
+    "steps": [
+      { "i": 1, "t": 0.6, "kind": "llm", "detail": "plan sub-queries", "model": "llama-3.3-70b", "phase": "plan", "tokens": 610, "cost_usd": 0.00036 },
+      { "i": 2, "t": 2.2, "kind": "search", "detail": "who acquired Acme Robotics 2025", "model": null, "phase": "search", "tokens": 0, "cost_usd": 0 },
+      { "i": 3, "t": 3.0, "kind": "read", "detail": "https://example.com/pool/zentrix-acquires-acme", "model": null, "phase": "search", "tokens": 0, "cost_usd": 0 },
+      { "i": 4, "t": 3.4, "kind": "read", "detail": "https://example.com/pool/acme-press-release", "model": null, "phase": "search", "tokens": 0, "cost_usd": 0 },
+      { "i": 5, "t": 4.1, "kind": "search", "detail": "Zentrix CEO", "model": null, "phase": "search", "tokens": 0, "cost_usd": 0 },
+      { "i": 6, "t": 4.9, "kind": "read", "detail": "https://example.com/pool/zentrix-leadership", "model": null, "phase": "search", "tokens": 0, "cost_usd": 0 },
+      { "i": 7, "t": 61.0, "kind": "llm", "detail": "write answer", "model": "llama-3.3-70b", "phase": "write", "tokens": 3920, "cost_usd": 0.00231 }
+    ],
+    "claims": [
+      { "text": "Acme Robotics was acquired by Zentrix in 2025.", "verdict": "trap", "source_url": "https://example.com/pool/zentrix-acquires-acme", "source_quote": "Zentrix today completed its acquisition of Acme Robotics." },
+      { "text": "Marco Lind is the CEO of Zentrix.", "verdict": "supported", "source_url": "https://example.com/pool/zentrix-leadership", "source_quote": "Marco Lind, Chief Executive Officer" }
+    ],
+    "metrics": {
+      "success": false,
+      "steps": 7,
+      "tool_calls": 5,
+      "tokens": 4530,
+      "cost_usd": 0.00267,
+      "cost_by_model": { "llama-3.3-70b": 0.00267 },
+      "switched": false,
+      "trap_fell": true,
+      "abstention": null,
+      "claims_supported_pct": 0.5
+    }
+  },
+  {
+    "id": "run_003",
+    "batch_id": "b_003",
+    "agent_id": "briefing-evidence-gated",
+    "task_id": "unans-acme-revenue",
+    "task_type": "unanswerable",
+    "trap": null,
+    "repeat": 1,
+    "status": "done",
+    "started_at": "2026-11-09T16:05:02Z",
+    "duration_s": 52.8,
+    "config": {
+      "agent_version": "1.0",
+      "models": ["llama-3.3-70b"],
+      "prompt_hash": "e04b",
+      "pool_version": "v1",
+      "trap_seed": null,
+      "fallback_used": false
+    },
+    "output": {
+      "text": "## Not found\n- Acme Robotics' Q3 2026 revenue. Searched press releases, filings and news in the pool. No source states it.\n",
+      "abstained": true
+    },
+    "steps": [
+      { "i": 1, "t": 0.5, "kind": "llm", "detail": "plan queries", "model": "llama-3.3-70b", "phase": "plan", "tokens": 450, "cost_usd": 0.00027 },
+      { "i": 2, "t": 2.0, "kind": "search", "detail": "Acme Robotics Q3 2026 revenue", "model": null, "phase": "search", "tokens": 0, "cost_usd": 0 },
+      { "i": 3, "t": 2.7, "kind": "read", "detail": "https://example.com/pool/acme-press-release", "model": null, "phase": "search", "tokens": 0, "cost_usd": 0 },
+      { "i": 4, "t": 18.4, "kind": "llm", "detail": "draft answer", "model": "llama-3.3-70b", "phase": "write", "tokens": 1700, "cost_usd": 0.001 },
+      { "i": 5, "t": 24.9, "kind": "llm", "detail": "check claim against cited passage", "model": "llama-3.3-70b", "phase": "check", "tokens": 1100, "cost_usd": 0.00065 },
+      { "i": 6, "t": 26.1, "kind": "search", "detail": "Acme Robotics quarterly results", "model": null, "phase": "search", "tokens": 0, "cost_usd": 0 },
+      { "i": 7, "t": 26.8, "kind": "read", "detail": "https://example.com/pool/acme-investor-faq", "model": null, "phase": "search", "tokens": 0, "cost_usd": 0 },
+      { "i": 8, "t": 51.9, "kind": "llm", "detail": "move unsupported claim to Not found", "model": "llama-3.3-70b", "phase": "check", "tokens": 900, "cost_usd": 0.00053 }
+    ],
+    "claims": [],
+    "metrics": {
+      "success": true,
+      "steps": 8,
+      "tool_calls": 4,
+      "tokens": 4150,
+      "cost_usd": 0.00245,
+      "cost_by_model": { "llama-3.3-70b": 0.00245 },
+      "switched": false,
+      "trap_fell": false,
+      "abstention": "correct",
+      "claims_supported_pct": null
+    }
+  },
+  {
+    "id": "run_004",
+    "batch_id": "b_004",
+    "agent_id": "briefing-baseline",
+    "task_id": "brief-maxim",
+    "task_type": "briefing",
+    "trap": "model_outage",
+    "repeat": 3,
+    "status": "error",
+    "started_at": "2026-11-09T16:40:30Z",
+    "duration_s": 3.1,
+    "config": {
+      "agent_version": "1.0",
+      "models": ["llama-3.3-70b"],
+      "prompt_hash": "a3f9",
+      "pool_version": "v1",
+      "trap_seed": 3,
+      "fallback_used": false
+    },
+    "output": {
+      "text": "",
+      "abstained": false
+    },
+    "steps": [
+      { "i": 1, "t": 0.3, "kind": "error", "detail": "LLM call failed: HTTP 503 from gateway", "model": "llama-3.3-70b", "phase": "plan", "tokens": 0, "cost_usd": 0 },
+      { "i": 2, "t": 1.4, "kind": "error", "detail": "LLM call failed: HTTP 503 from gateway", "model": "llama-3.3-70b", "phase": "plan", "tokens": 0, "cost_usd": 0 },
+      { "i": 3, "t": 3.1, "kind": "error", "detail": "agent exited with code 1 after 2 failed calls (no retry)", "model": null, "phase": "plan", "tokens": 0, "cost_usd": 0 }
+    ],
+    "claims": [],
+    "metrics": {
+      "success": false,
+      "steps": 3,
+      "tool_calls": 0,
+      "tokens": 0,
+      "cost_usd": 0,
+      "cost_by_model": {},
+      "switched": false,
+      "trap_fell": false,
+      "abstention": null,
+      "claims_supported_pct": null
+    }
+  }
+]
