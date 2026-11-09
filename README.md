@@ -75,25 +75,51 @@ A run's step-by-step trace is built from the two places every research agent mus
 | Models | Open models (Llama family) on free tiers for agents. An OpenAI GPT model as the judge |
 | Deploy | One Docker image (Hugging Face Space) |
 
-## Getting started _(planned)_
+## Getting started
 
-Prerequisites: Docker Desktop (full stack), or Node 20 + Python 3.12 + [uv](https://docs.astral.sh/uv/) to run parts separately. API keys: Tavily, OpenAI (judge), and at least one free provider (Groq, OpenRouter, Gemini or Cerebras).
+Prerequisites: Docker Desktop (full stack), or Node 20.19+ + Python 3.12 + [uv](https://docs.astral.sh/uv/) to run parts separately. API keys: Tavily, OpenAI (judge), and at least one free provider (Groq, OpenRouter, Gemini or Cerebras).
+
+The API currently serves fake run records from `web/src/fixtures/`. The runner, SQLite and live endpoints come next.
+
+**Full stack** (app + API at http://localhost:8000, Bifrost UI at http://localhost:8080). The Bifrost dashboard asks for `BIFROST_SETUP_TOKEN` (any secret you put in `.env`) once, to create the admin account:
 
 ```bash
 git clone https://github.com/HeyJudo/Assay-research.git
 cd Assay-research
 cp .env.example .env    # add your keys
-docker compose up       # app at http://localhost:8000
+docker compose up --build
 ```
 
-## Repository layout _(planned)_
+**Frontend only** (Node, no Python; reads the fixtures directly, http://localhost:5173):
+
+```bash
+cd web
+npm install
+npm run dev
+```
+
+**Backend only** (API at http://localhost:8000/api/runs, docs at `/docs`):
+
+```bash
+cd backend
+uv run uvicorn assay.api:app --reload
+```
+
+**Bifrost alone** (UI at http://localhost:8080, reads `bifrost/config.json`; export the keys from `.env` first):
+
+```bash
+npx -y @maximhq/bifrost -app-dir ./bifrost
+```
+
+## Repository layout
 
 ```
-backend/   FastAPI app, runner, search proxy, graders, Briefing Agent
-web/       React dashboard
-data/      tasks, pools, practice tasks
-bifrost/   Bifrost config
-docs/      PRD and hackathon context
+backend/assay/      FastAPI app (api.py) and the run record (models.py)
+web/src/            React app: pages/, types.ts (mirrors models.py), fixtures/ (fake data, shared with the API)
+bifrost/            Bifrost config.json
+docs/               PRD and hackathon context
+Dockerfile          one image: builds web/, FastAPI serves it + the API on port 8000
+docker-compose.yml  app + Bifrost
 ```
 
 ## Methodology
