@@ -74,4 +74,4 @@ The criteria are innovation, technical execution, problem and potential impact, 
 
 - The PS06 PDF says Tavily + Bifrost are mandatory, while the FAQ says neither is. To confirm on Discord if it matters.
 - Rule 8 says one submission per team, while the FAQ allows separate Bifrost and Tavily entries.
-- **Competitor:** AgentArena (github.com/PSP-YN/AgentArena) is another team's PS02 entry. It is generic: toy tool tasks, exact-match grading, Bifrost only, no Tavily, no research focus.
+- **Positioning:** other PS02 entries may target general tool-use tasks. Assay's angle is the research category: frozen web, traps, claim-level checks.

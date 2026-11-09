@@ -116,3 +116,7 @@ We build with AI-assisted development. Claude Code (Anthropic) helped with plann
 
 - [`docs/PRD.md`](docs/PRD.md): full spec, data contracts, roles and schedule
 - [`docs/HACKATHON_CONTEXT.md`](docs/HACKATHON_CONTEXT.md): rules, judging criteria, submission checklist
+
+## License
+
+[MIT](LICENSE)

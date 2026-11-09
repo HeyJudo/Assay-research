@@ -27,7 +27,7 @@ We also built a **Briefing Agent** (PS05) in 3 versions that differ in one thing
 | "Cheap model first" is untested for multi-step agents | Cascades matched GPT-4 at up to 98% lower cost on single questions (FrugalGPT, arXiv 2305.05176) |
 | Leaderboards say who won, not why | Outside agents differ in model, prompt and search all at once; the PS02 brief names this problem |
 
-**Competitors:** AgentArena (another PS02 team: generic tasks, exact match only, no Tavily), Deep Research Comparator (human graders), LangSmith / Langfuse / Arize / Maxim (monitor one app, no fair head-to-head), Promptfoo / Inspect / Braintrust (prompt evals), HAL / BrowseComp-Plus (fixed academic sets). None combines a frozen web, traps, claim-level checks, abstention scoring, and reliability + cost, or uses them to test one design choice at a time.
+**Related work:** general agent benchmarks (tool-use tasks scored by exact match), Deep Research Comparator (human graders), LangSmith / Langfuse / Arize / Maxim (monitor one app, no fair head-to-head), Promptfoo / Inspect / Braintrust (prompt evals), HAL / BrowseComp-Plus (fixed academic sets). None combines a frozen web, traps, claim-level checks, abstention scoring, and reliability + cost, or uses them to test one design choice at a time.
 
 ## 2. Who it's for
 
