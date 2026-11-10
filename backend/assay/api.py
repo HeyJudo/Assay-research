@@ -1,15 +1,18 @@
-"""Read-only API on fixture data. Runner, SQLite, POST and SSE endpoints come later (PRD §8)."""
+"""Read-only API. Runs come from SQLite (seeded from fixtures when empty). Leaderboard, agents, tasks and compare still read fixtures. POST and SSE endpoints come later (PRD §8)."""
 
 import json
+import os
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
 
+from assay import store
 from assay.models import Agent, Compare, LeaderboardRow, RunRecord, Task
 
 ROOT = Path(__file__).resolve().parents[2]
-FIXTURES = ROOT / "web" / "src" / "fixtures"  # ponytail: one copy shared with the web app; swap for SQLite when the runner lands
+FIXTURES = ROOT / "web" / "src" / "fixtures"  # ponytail: one copy shared with the web app
 DIST = ROOT / "web" / "dist"
 
 
@@ -17,12 +20,18 @@ def load(name: str, model):
     return [model.model_validate(x) for x in json.loads((FIXTURES / name).read_text("utf-8"))]
 
 
-RUNS = load("runs.json", RunRecord)
 AGENTS = load("agents.json", Agent)
 TASKS = load("tasks.json", Task)
 LEADERBOARD = load("leaderboard.json", LeaderboardRow)
 
-app = FastAPI(title="Assay")
+@asynccontextmanager
+async def lifespan(_):
+    if os.environ.get("ASSAY_SEED_FIXTURES") == "1":
+        store.seed_if_empty()
+    yield
+
+
+app = FastAPI(title="Assay", lifespan=lifespan)
 
 
 @app.get("/api/health")
@@ -47,21 +56,15 @@ def tasks() -> list[Task]:
 
 @app.get("/api/runs")
 def runs(batch_id: str | None = None, agent_id: str | None = None, task_id: str | None = None):
-    return [
-        r.model_dump(exclude={"steps"})
-        for r in RUNS
-        if (batch_id is None or r.batch_id == batch_id)
-        and (agent_id is None or r.agent_id == agent_id)
-        and (task_id is None or r.task_id == task_id)
-    ]
+    return [r.model_dump(exclude={"steps"}) for r in store.list_runs(batch_id, agent_id, task_id)]
 
 
 @app.get("/api/runs/{run_id}")
 def run(run_id: str) -> RunRecord:
-    for r in RUNS:
-        if r.id == run_id:
-            return r
-    raise HTTPException(404, "run not found")
+    r = store.get(run_id)
+    if r is None:
+        raise HTTPException(404, "run not found")
+    return r
 
 
 @app.get("/api/compare")
