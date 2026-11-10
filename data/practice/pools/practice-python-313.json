@@ -5,7 +5,7 @@
     {
       "url": "https://docs-python.invalid/3.13/free-threading",
       "title": "Free-threaded CPython in Python 3.13",
-      "content": "Python 3.13 ships an experimental free-threaded build that runs without the global interpreter lock.\n\nIt is not the default build. You must choose it when installing or compiling.",
+      "content": "Python 3.13 ships an experimental free-threaded build that runs without the global interpreter lock.\n\nIt is not the default build. You must choose it when installing or compiling.\n\nThe free-threaded interpreter lets several threads run Python bytecode at the same time on separate cores. Extension modules must declare that they support running without the lock, otherwise the interpreter turns the lock back on when they load. Single-threaded programs run somewhat slower on this build, because some optimizations are disabled to keep object access safe. The project expects to close that gap in later releases as the design matures.",
       "published_date": "2024-10-07"
     },
     {

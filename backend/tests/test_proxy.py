@@ -119,6 +119,19 @@ def test_search_matches_real_tavily_shape(proxy):
     assert body["results"][0]["raw_content"].startswith("Python 3.13 ships")
 
 
+def test_search_content_is_a_snippet(proxy):
+    full = json.loads(POOL.read_text(encoding="utf-8"))["docs"][0]["content"]
+    assert len(full) > 500
+    short, = [d["content"] for d in json.loads(POOL.read_text(encoding="utf-8"))["docs"] if d["url"] == JIT]
+    plain = search(proxy, query="free threaded build").json()["results"]
+    raw = search(proxy, query="free threaded build", include_raw_content=True).json()["results"]
+    assert plain[0]["raw_content"] is None
+    assert 0 < len(plain[0]["content"]) <= 500 and full.startswith(plain[0]["content"])
+    assert full[len(plain[0]["content"])] in (" ", chr(10))  # cut at a word boundary
+    assert raw[0]["raw_content"] == full
+    assert plain[1]["content"] == short  # short docs are returned whole
+
+
 def test_search_max_results(proxy):
     assert len(search(proxy, query="free threaded build", max_results=1).json()["results"]) == 1
 

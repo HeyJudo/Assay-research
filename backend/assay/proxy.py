@@ -36,6 +36,11 @@ def norm(url):
     return url.split("#")[0].rstrip("/")
 
 
+def snippet(text, n=500):
+    # ponytail: query-agnostic prefix, real Tavily picks the relevant chunk
+    return text if len(text) <= n else text[:n].rsplit(None, 1)[0]
+
+
 def words(text):
     return set(re.findall(r"\w+", text.lower()))
 
@@ -95,7 +100,7 @@ class Proxy:
         # TRAPS (later task): reorder/inject results or return 503 here.
         raw = body.get("include_raw_content")
         results = [
-            {"url": d["url"], "title": d["title"], "content": d["content"], "score": s / len(q),
+            {"url": d["url"], "title": d["title"], "content": snippet(d["content"]), "score": s / len(q),
              "raw_content": d["content"] if raw else None, "published_date": d.get("published_date")}
             for s, d in hits
         ]
