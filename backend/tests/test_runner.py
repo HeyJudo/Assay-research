@@ -1,5 +1,6 @@
 import json
 import subprocess
+import time
 import sys
 from pathlib import Path
 
@@ -106,3 +107,16 @@ def test_cli(tmp_path, monkeypatch):
         capture_output=True, text=True, check=True)
     rec = store.get(out.stdout.strip())
     assert rec is not None and rec.status == "done"
+
+
+def test_timeout_kills_grandchild(tmp_path):
+    marker = tmp_path / "marker"
+    body = ("import subprocess\n"
+            "subprocess.Popen([sys.executable, '-c', 'import sys, time; time.sleep(3); open(sys.argv[1], \"w\").write(\"x\")', "
+            f"{str(marker)!r}])\n"
+            "time.sleep(30)\n")
+    rec = runner.run_once(make_agent(tmp_path, body), TASK, timeout_s=1)
+    assert rec.status == "error"
+    assert rec.duration_s < 10
+    time.sleep(5)
+    assert not marker.exists()
