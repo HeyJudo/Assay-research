@@ -154,3 +154,12 @@ def test_cli_agent_key_from_env(tmp_path, monkeypatch):
         cwd=BACKEND, env={**os.environ, "ASSAY_DB": str(db), "ASSAY_AGENT_API_KEY": "sk-bf-virtual"},
         capture_output=True, text=True, check=True)
     assert store.get(out.stdout.strip()).output.text == "sk-bf-virtual"
+
+
+def test_stderr_keys_redacted(tmp_path):
+    secrets = ["sk-bf-abc123", "tvly-XYZ", "gsk_q", "AIzaSyQ", "csk-9", "sk-proj-77"]
+    body = f"sys.stderr.write({' '.join(secrets)!r})\nsys.exit(1)\n"
+    rec = runner.run_once(make_agent(tmp_path, body), TASK, **CFG)
+    detail = rec.steps[0].detail
+    assert "[redacted]" in detail
+    assert not any(s in detail for s in secrets)

@@ -2,6 +2,7 @@
 
 import argparse
 import os
+import re
 import signal
 import subprocess
 import sys
@@ -16,6 +17,8 @@ from assay.models import RunConfig, RunMetrics, RunOutput, RunRecord, Step, Task
 
 # Allowlist, not os.environ: the parent holds the real judge and provider keys.
 OS_BASICS = ["PATH", "SYSTEMROOT", "COMSPEC", "PATHEXT", "TEMP", "TMP", "HOME", "USERPROFILE", "LANG", "LC_ALL"]
+
+KEY_RE = re.compile(r"(?:sk-bf-|sk-|tvly-|gsk_|AIza|csk-)[A-Za-z0-9_\-]+")
 
 
 def _command(run: Path) -> list[str]:
@@ -67,7 +70,7 @@ def run_once(agent_dir: Path, task: Task, *, agent_version: str, models: list[st
                     raise
             if p.returncode != 0:
                 stderr = (Path(tmp) / "stderr").read_text(encoding="utf-8", errors="replace")
-                error = f"exit {p.returncode}: {stderr[-500:]}"
+                error = f"exit {p.returncode}: {KEY_RE.sub('[redacted]', stderr)[-500:]}"
             elif not out.exists():
                 error = "no output file"
             else:
