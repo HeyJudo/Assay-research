@@ -53,7 +53,7 @@ def test_env_routing_and_allowlist(tmp_path, monkeypatch):
     assert env["ASSAY_TASK"] == "What is 2+2?"
     assert env["ASSAY_AS_OF"] == "2026-01-02"
     assert env["ASSAY_OUTPUT"]
-    assert "TAVILY_API_KEY" not in env and "OPENAI_API_KEY" not in env
+    assert env["TAVILY_API_KEY"] == "" and env["OPENAI_API_KEY"] == ""
 
     rec = runner.run_once(agent, TASK, **CFG, openai_base_url="http://b/v1", openai_api_key="k",
                           https_proxy="http://p:1", ca_cert="/ca.pem")
@@ -63,7 +63,18 @@ def test_env_routing_and_allowlist(tmp_path, monkeypatch):
     assert env["HTTPS_PROXY"] == "http://p:1"
     assert env["SSL_CERT_FILE"] == "/ca.pem"
     assert env["REQUESTS_CA_BUNDLE"] == "/ca.pem"
-    assert "TAVILY_API_KEY" not in env
+    assert env["TAVILY_API_KEY"] == ""
+
+
+def test_dotenv_cannot_fill_blanked_keys(tmp_path):
+    (tmp_path / ".env").write_text("TAVILY_API_KEY=sentinel-from-dotenv\n")
+    d = tmp_path / "backend" / "agents" / "dotenv-agent"
+    d.mkdir(parents=True)
+    (d / "run").write_text("#!/usr/bin/env python3\nfrom dotenv import load_dotenv; load_dotenv()\nimport os\n"
+                           "open(os.environ['ASSAY_OUTPUT'],'w').write(os.environ.get('TAVILY_API_KEY','<unset>'))\n")
+    (d / "run").chmod(0o755)
+    rec = runner.run_once(d, TASK, **CFG, openai_api_key="k")
+    assert rec.status == "done" and rec.output.text == ""
 
 
 def test_nonzero_exit(tmp_path):

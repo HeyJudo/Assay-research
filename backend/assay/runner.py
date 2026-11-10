@@ -39,6 +39,14 @@ def run_once(agent_dir: Path, task: Task, *, agent_version: str, models: list[st
         raise ValueError("agent_version, models and prompt_hash are required")
     started = datetime.now(timezone.utc)
     env = {k: os.environ[k] for k in OS_BASICS if k in os.environ}
+    # Blank every .env.example name so load_dotenv(override=False) in the agent can't fill real keys from the repo-root .env.
+    try:
+        for line in (Path(__file__).resolve().parents[2] / ".env.example").read_text(encoding="utf-8").splitlines():
+            name = line.partition("=")[0].strip()
+            if name and not name.startswith("#") and "=" in line:
+                env.setdefault(name, "")
+    except OSError:  # the Docker image doesn't ship .env.example
+        pass
     env.update(ASSAY_TASK=task.prompt, ASSAY_AS_OF=task.as_of_date)
     for k, v in {"OPENAI_BASE_URL": openai_base_url, "OPENAI_API_KEY": openai_api_key,
                  "HTTPS_PROXY": https_proxy, "SSL_CERT_FILE": ca_cert, "REQUESTS_CA_BUNDLE": ca_cert}.items():
