@@ -49,6 +49,7 @@ def proxy(tmp_path_factory):
         pytest.fail("proxy did not come up:\n" + (tmp / "mitmdump.out").read_text())
     with httpx.Client(proxy=f"http://127.0.0.1:{port}", verify=ssl.create_default_context(cafile=str(ca)), timeout=10) as c:
         c.log = log
+        c.port = port
         yield c
     p.kill()
     p.wait()
@@ -156,3 +157,36 @@ def test_malformed_tavily_body_fails_closed(proxy, path, body):
 def test_spoofed_localhost_host_header_is_not_passthrough(proxy):
     r = proxy.get("https://pool-only.invalid/page", headers={"Host": "localhost"})
     assert (r.status_code, r.text) == (404, "not in pool")
+
+
+def test_raw_tcp_over_connect_is_not_relayed(proxy):
+    # A local TCP sentinel stands in for a real host: it must never get the bytes.
+    got = []
+    srv = socket.create_server(("127.0.0.1", 0))
+    srv.settimeout(5)
+
+    def accept():
+        try:
+            conn, _ = srv.accept()
+            conn.settimeout(3)
+            got.append(conn.recv(100))
+        except OSError:
+            pass
+
+    t = threading.Thread(target=accept)
+    t.start()
+    port = srv.getsockname()[1]
+    proxy_port = proxy.port
+    k = socket.create_connection(("127.0.0.1", proxy_port))
+    k.sendall(f"CONNECT 127.0.0.1:{port} HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\n\r\n".encode())
+    assert k.recv(100).startswith(b"HTTP/1.1 200")
+    k.sendall(b"\x00\x01binary-not-http\r\n")
+    k.settimeout(5)
+    try:
+        k.recv(100)
+    except OSError:
+        pass
+    k.close()
+    t.join()
+    srv.close()
+    assert got in ([], [b""])

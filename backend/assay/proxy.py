@@ -46,6 +46,9 @@ class Proxy:
     def running(self):
         # Default "eager" would connect upstream on CONNECT and break made-up pool hosts.
         ctx.options.connection_strategy = "lazy"
+        # Non-HTTP bytes over CONNECT would otherwise be relayed raw to the real host
+        # (tcp_start cannot stop it). With rawtcp off they hit the HTTP parser and fail.
+        ctx.options.rawtcp = False
 
     def write(self, kind, results, **key):
         self.log.write(json.dumps({"t": time.time(), "kind": kind, **key, "results": results}) + "\n")
@@ -58,13 +61,6 @@ class Proxy:
         except Exception:
             ctx.log.error(traceback.format_exc())
             flow.response = http.Response.make(500, b"assay proxy error")
-
-    # Raw TCP/UDP (e.g. via CONNECT) must never reach a real host.
-    def tcp_start(self, flow):
-        flow.kill()
-
-    def udp_start(self, flow):
-        flow.kill()
 
     def route(self, flow):
         req = flow.request
