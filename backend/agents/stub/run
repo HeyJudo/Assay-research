@@ -1,0 +1,9 @@
+#!/usr/bin/env python3
+import os
+from pathlib import Path
+
+Path(os.environ["ASSAY_OUTPUT"]).write_text(
+    f"Stub answer to: {os.environ['ASSAY_TASK']}\nAs of {os.environ['ASSAY_AS_OF']}.\n"
+    "See [1](https://example.com/pool/stub-source).\n",
+    encoding="utf-8",
+)
