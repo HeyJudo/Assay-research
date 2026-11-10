@@ -1,0 +1,36 @@
+{
+  "task_id": "practice-python-313",
+  "pool_version": "practice-v1",
+  "docs": [
+    {
+      "url": "https://docs-python.invalid/3.13/free-threading",
+      "title": "Free-threaded CPython in Python 3.13",
+      "content": "Python 3.13 ships an experimental free-threaded build that runs without the global interpreter lock.\n\nIt is not the default build. You must choose it when installing or compiling.",
+      "published_date": "2024-10-07"
+    },
+    {
+      "url": "https://docs-python.invalid/3.13/jit",
+      "title": "Experimental JIT compiler",
+      "content": "Python 3.13 adds an experimental just-in-time compiler. It is off by default and is switched on at build time with a configure flag.",
+      "published_date": "2024-10-07"
+    },
+    {
+      "url": "https://blog-python.invalid/new-repl",
+      "title": "The new interactive REPL",
+      "content": "The interactive interpreter in Python 3.13 is based on code from PyPy. It supports multiline editing and colored prompts.",
+      "published_date": "2024-09-15"
+    },
+    {
+      "url": "https://news-python.invalid/313-release",
+      "title": "Python 3.13.0 release",
+      "content": "Python 3.13.0 was released on October 7, 2024. It is the latest feature release of the language.",
+      "published_date": "2024-10-07"
+    },
+    {
+      "url": "https://news-python.invalid/312-release",
+      "title": "Python 3.12 release notes",
+      "content": "Python 3.12 was released in October 2023 and improved error messages.",
+      "published_date": "2023-10-02"
+    }
+  ]
+}

@@ -1,0 +1,46 @@
+{
+  "search": {
+    "query": "Python 3.13 free-threaded build",
+    "follow_up_questions": null,
+    "answer": null,
+    "images": [],
+    "results": [
+      {
+        "url": "https://www.infoworld.com/article/3552750/get-started-with-the-free-threaded-build-of-python-3-13.html",
+        "title": "Get started with the free-threaded build of Python 3.13",
+        "content": ", two Python executables are installed: `python` and `python3.13t`. The former is the regular build; the latter is the free-threaded build.\n\nImage 3: Python 3.13 install pane with free-threaded build option\n\nPython 3.13\u2019s installer lets you install the free-threaded build of Python side-by-side with the regular build. You can use the \u201cpy\u201d utility to select which one to use for a given program.\n\nIDG [...] Python 3.13.0 (tags/v3.13.0:60403a5, Oct 7 2024, 09:38:07) [MSC v.1941 64 bit (AMD64)] on win32\nRun `py -3.13t`, and you\u2019ll launch the free-threaded build:\n\nPython 3.13.0 experimental free-threading build (tags/v3.13.0:60403a5, Oct 7 2024, 09:53:29) [MSC v.1941 64 bit (AMD64)] on win32",
+        "score": 0.90810597,
+        "raw_content": null,
+        "id": "9ecc78-00"
+      },
+      {
+        "url": "https://www.itechguides.com/get-started-with-the-free-threaded-build-of-python-3-13",
+        "title": "Get started with the free-threaded build of Python 3.13",
+        "content": "## What is the free-threaded build of Python 3.13?\n\nThe free-threaded build of Python 3.13 is CPython compiled with the Global Interpreter Lock disabled. The standard CPython build uses the GIL to prevent multiple native threads from executing Python bytecode simultaneously; the free-threaded build removes that interpreter-level restriction so genuinely parallel threads can run Python code on multiple CPU cores.\n\nDrivers \u00b7 Free Tool\n\n### Crashes, No Sound, or Screen Glitches? [...] Python 3.13 free threading trades some single-threaded efficiency for the possibility of parallel Python execution. According to the Python 3.13 free-threading HOWTO, the free-threaded build has approximately 40% overhead on the pyperformance suite compared with the default GIL-enabled build. [...] ` should return `1`, while `sys._is_gil_enabled()` should normally return `False`.\n Python 3.13\u2019s free-threaded build carries approximately 40% overhead on the official pyperformance suite compared with the default build, so it is not a universal speed upgrade.\n Native extensions can lack compatible wheels or automatically re-enable the GIL when imported.\n Free threading permits parallel execution but does not make shared mutable state, iterators, or frame inspection automatically safe.",
+        "score": 0.93610436,
+        "raw_content": null,
+        "id": "457273-01"
+      }
+    ],
+    "response_time": 3.29,
+    "request_id": "deddadc0-5e08-4a52-a802-91d5c30dc4fa"
+  },
+  "extract": {
+    "results": [
+      {
+        "url": "https://www.infoworld.com/article/3552750/get-started-with-the-free-threaded-build-of-python-3-13.html",
+        "title": "Get started with the free-threaded build of Python 3.13",
+        "raw_content": "[](https://www.infoworld.com/)\n\n1.   Topics\n2.   [Latest](https://www.infoworld.com/news/)\n3.   [Newsletters](https://www.infoworld.com/newsletters/signup/)\n4.   [Resources](https://us.resources.infoworld.com/)\n5.   [Buyer\u2019s Guides](https://www.infoworld.com/enterprise-buyers-guide/)\n6.   [Events](h",
+        "images": []
+      }
+    ],
+    "failed_results": [
+      {
+        "url": "https://nonexistent.invalid/x",
+        "error": "Failed to fetch url"
+      }
+    ],
+    "response_time": 0.21,
+    "request_id": "d838f07f-0ab0-4267-a143-77e0f524e6ef"
+  }
+}
