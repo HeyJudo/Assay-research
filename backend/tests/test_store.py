@@ -46,3 +46,11 @@ def test_seed_if_empty():
     store.save(first.model_copy(update={"repeat": 99}))
     store.seed_if_empty()
     assert store.get(first.id).repeat == 99
+
+
+def test_connections_closed():
+    # An open connection locks the file on Windows, blocking the runner CLI and the API side by side.
+    store.seed_if_empty()
+    store.get("run_001")
+    store.list_runs(agent_id="x")
+    store.db_path().unlink()
