@@ -110,7 +110,8 @@ class Proxy:
     def search(self, flow):
         t0 = time.time()
         body = parse(flow)
-        query, n = body.get("query"), body.get("max_results", 5)
+        query, n = body.get("query"), body.get("max_results")
+        n = 5 if n is None else n  # null means default, like real Tavily
         if not isinstance(query, str) or not query.strip():
             raise BadRequest("Query is missing or empty")
         if type(n) is not int:

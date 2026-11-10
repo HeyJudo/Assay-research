@@ -29,10 +29,10 @@ def free_port():
         return s.getsockname()[1]
 
 
-def launch(tmp, script=ROOT / "backend" / "assay" / "proxy.py", mode=True):
+def launch(tmp, script=ROOT / "backend" / "assay" / "proxy.py", mode=True, pool=POOL):
     """Start a real mitmdump. Returns (process, port, ca path, search log, output file)."""
     port, log, out = free_port(), tmp / "search.jsonl", open(tmp / "mitmdump.out", "w")
-    env = {**os.environ, "ASSAY_POOL_FILE": str(POOL), "ASSAY_SEARCH_LOG": str(log)}
+    env = {**os.environ, "ASSAY_POOL_FILE": str(pool), "ASSAY_SEARCH_LOG": str(log)}
     cmd = [sys.executable, "-c", "from mitmproxy.tools.main import mitmdump; mitmdump()",
            "-s", str(script), "--listen-host", "127.0.0.1", "--listen-port", str(port),
            "--set", f"confdir={tmp}", "--set", "connection_strategy=lazy", "--set", "rawtcp=false"]
@@ -207,7 +207,7 @@ def test_localhost_is_not_passed_through(proxy):
 
 def test_broken_addon_fails_closed(tmp_path):
     script = tmp_path / "proxy.py"
-    script.write_text((ROOT / "backend" / "assay" / "proxy.py").read_text())
+    script.write_text((ROOT / "backend" / "assay" / "proxy.py").read_text(encoding="utf-8"), encoding="utf-8")
     p, port, ca, log, out = launch(tmp_path, script)
     srv, hits = sentinel()
     try:
@@ -240,7 +240,7 @@ def test_refuses_to_run_without_upstream_mode(tmp_path):
         p.kill()
         p.wait()
         out.close()
-    assert "upstream" in (tmp_path / "mitmdump.out").read_text()
+    assert "refusing to start" in (tmp_path / "mitmdump.out").read_text()
 
 
 BAD = [
@@ -266,6 +266,26 @@ def test_max_results_is_clamped(proxy):
     assert search(proxy, query="python", max_results=0).json()["results"] == []
     assert search(proxy, query="python", max_results=-3).json()["results"] == []
     assert len(search(proxy, query="python", max_results=1000).json()["results"]) == 5
+
+
+def test_max_results_capped_at_20(tmp_path):
+    pool = tmp_path / "big.json"
+    docs = [{"url": f"https://big.invalid/{i}", "title": f"doc {i}", "content": "python", "published_date": None}
+            for i in range(25)]
+    pool.write_text(json.dumps({"task_id": "big", "pool_version": "t", "docs": docs}))
+    p, port, ca, log, out = launch(tmp_path, pool=pool)
+    try:
+        wait_up(p, port, ca, tmp_path)
+        with client(port, ca) as c:
+            assert len(search(c, query="python", max_results=1000).json()["results"]) == 20
+    finally:
+        p.kill()
+        p.wait()
+        out.close()
+
+
+def test_max_results_null_means_default(proxy):
+    assert len(search(proxy, query="python", max_results=None).json()["results"]) == 5
 
 
 def test_unexpected_error_still_fails_closed(proxy):
