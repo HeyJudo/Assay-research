@@ -6,6 +6,7 @@ import subprocess
 import sys
 import threading
 import time
+import uuid
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 
@@ -114,8 +115,22 @@ def test_search_ranks_pool_docs(proxy):
 def test_search_matches_real_tavily_shape(proxy):
     body = search(proxy, query="free threaded build", include_raw_content=True).json()
     real = REAL["search"]
-    assert set(real) - {"request_id"} <= set(body) <= set(real)
-    assert set(real["results"][0]) - {"id"} <= set(body["results"][0]) <= set(real["results"][0]) | {"published_date"}
+    assert set(body) == set(real)
+    assert all(set(r) == set(real["results"][0]) for r in body["results"])
+    rid = body["request_id"]
+    assert [r["id"] for r in body["results"]] == [f"{rid[:6]}-00", f"{rid[:6]}-01"]
+    assert str(uuid.UUID(rid)) == rid
+
+
+def test_search_news_topic_adds_published_date(proxy):
+    news = search(proxy, query="free threaded build", topic="news").json()["results"]
+    assert [r["published_date"] for r in news] == ["2024-10-07", "2024-10-07"]
+    other = search(proxy, query="free threaded build", topic="general").json()["results"]
+    assert all("published_date" not in r for r in other)
+
+
+def test_search_raw_content_when_asked(proxy):
+    body = search(proxy, query="free threaded build", include_raw_content=True).json()
     assert body["results"][0]["raw_content"].startswith("Python 3.13 ships")
 
 
@@ -142,8 +157,10 @@ def test_extract(proxy):
     assert "just-in-time compiler" in body["results"][0]["raw_content"]
     assert body["failed_results"] == [{"url": "https://nope.invalid/x", "error": "Failed to fetch url"}]
     real = REAL["extract"]
-    assert set(real) - {"request_id"} <= set(body) <= set(real)
+    assert set(body) == set(real)
     assert set(body["results"][0]) == set(real["results"][0])
+    assert set(body["failed_results"][0]) == set(real["failed_results"][0])
+    assert str(uuid.UUID(body["request_id"])) == body["request_id"]
 
 
 def test_unknown_tavily_path_404(proxy):

@@ -25,6 +25,7 @@ import os
 import re
 import time
 import traceback
+import uuid
 
 from mitmproxy import ctx, http
 
@@ -121,16 +122,20 @@ class Proxy:
         hits = sorted((s for s in scored if s[0] > 0), key=lambda s: -s[0])[:n]
         # TRAPS (later task): reorder/inject results or return 503 here.
         raw = body.get("include_raw_content")
-        results = [
-            {"url": d["url"], "title": d["title"], "content": snippet(d["content"]), "score": s / len(q),
-             "raw_content": d["content"] if raw else None, "published_date": d.get("published_date")}
-            for s, d in hits
-        ]
+        rid = str(uuid.uuid4())
+        results = []
+        for i, (sc, d) in enumerate(hits):
+            r = {"url": d["url"], "title": d["title"], "content": snippet(d["content"]), "score": sc / len(q),
+                 "raw_content": d["content"] if raw else None, "id": f"{rid[:6]}-{i:02d}"}
+            if body.get("topic") == "news":  # real Tavily only returns dates for news
+                r["published_date"] = d.get("published_date")
+            results.append(r)
         self.write("search", [r["url"] for r in results], query=query)
         flow.response = http.Response.make(
             200,
             json.dumps({"query": query, "follow_up_questions": None, "answer": None, "images": [],
-                        "results": results, "response_time": round(time.time() - t0, 3)}),
+                        "results": results, "response_time": round(time.time() - t0, 3),
+                        "request_id": rid}),
             {"Content-Type": "application/json"},
         )
 
@@ -150,6 +155,7 @@ class Proxy:
                             for d in found],
                 "failed_results": [{"url": u, "error": "Failed to fetch url"} for u in failed],
                 "response_time": round(time.time() - t0, 3),
+                "request_id": str(uuid.uuid4()),
             }),
             {"Content-Type": "application/json"},
         )
