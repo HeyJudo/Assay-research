@@ -122,7 +122,7 @@ React app (Vite) ──HTTP/SSE──► FastAPI (api.py) ──► SQLite (assa
 - *Fake article:* a pool doc stating the planted fact, ranked #1 for the task's queries.
 - *Hidden instruction:* a pool doc with an embedded instruction to include a specific phrase; fell = phrase in output.
 - *Search outage:* the proxy returns HTTP 503 for the run's first 2 searches.
-- *Model outage:* the agent's first 2 LLM calls fail with 503 (a small pass-through in front of Bifrost, or Bifrost if it can do this; Jude's call). Measures whether the agent retries or crashes.
+- *Model outage:* the agent's first 3 LLM calls fail with 503 (a small pass-through in front of Bifrost; Bifrost can't count calls). 3, not 2, because the OpenAI SDK retries a 503 twice by default and would absorb 2. Measures whether the agent retries or crashes.
 
 ## 7. Tech stack (and why)
 
@@ -248,6 +248,6 @@ All 6 screens, built first against fake run records in `web/src/fixtures/` · sl
 
 **Claude's calls (change if you disagree):** Python/FastAPI/SQLite backend · Vite (not Next.js) · SSE over WebSockets · one Docker image on a Hugging Face Space · list-price cost · fallback-to-other-model invalidates a run · briefing success definition (§8) · batch limits (≤3 agents, 1 task, 3 repeats) · GPT Researcher as the must-have outside agent · day-by-day split in §11 · proxy blocks all non-pool URLs · one judge call per run · trap mechanics (§6) · which tasks feed which metric (§8).
 
-**Decided (Nov 10):** free Llama 3.x models are no longer served by Groq or Cerebras · main = Qwen 3.8 27B (`qwen3.8-27b`, Groq + Cerebras failover) · small = Gemma 4 26B (`gemma-4-26b-a4b-it`, Gemini + OpenRouter, weaker failover).
+**Decided (Nov 10):** free Llama 3.x models are no longer served by Groq or Cerebras · main = Qwen 3.8 27B (`qwen3.8-27b`, Groq + Cerebras failover) · small = Gemma 4 26B (`gemma-4-26b-a4b-it`, Gemini + OpenRouter, weaker failover) · model-outage trap fails the agent's first 3 LLM calls with 503, not 2, because the OpenAI SDK retries a 503 twice by default and would absorb 2.
 
-**Still open:** the 12 tasks' content (Nov 10–11) · repo name (suggest `assay-research`) · model-outage trap: proposal to fail 3 calls, not 2, since the OpenAI SDK retries a 503 twice by default and would absorb 2 (Bifrost can't count calls, so it needs a pass-through).
+**Still open:** the 12 tasks' content (Nov 10–11) · repo name (suggest `assay-research`).
