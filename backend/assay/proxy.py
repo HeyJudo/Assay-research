@@ -3,14 +3,18 @@
 Run from backend/ (8080 is Bifrost, so dev uses 8081):
     ASSAY_POOL_FILE=../data/practice/pools/practice-python-313.json \
     ASSAY_SEARCH_LOG=search.jsonl \
-    uv run mitmdump -s assay/proxy.py --listen-port 8081
+    uv run mitmdump -s assay/proxy.py --listen-port 8081         --mode upstream:http://127.0.0.1:9 --set connection_strategy=lazy --set rawtcp=false
+
+The upstream mode points at a dead port on purpose: mitmproxy hot-reloads scripts, and a failed
+reload unloads this add-on. Without the dead upstream every request would then reach the real
+internet. With it they get 502. The add-on refuses to run without that mode.
 
 Pool file, data/pools/<task_id>.json (practice pools: data/practice/pools/):
     {"task_id": str, "pool_version": str,
      "docs": [{"url", "title", "content", "published_date"}]}
 
 Behavior (PRD section 6):
-- localhost / 127.0.0.1 / ::1 pass through untouched (Bifrost).
+- No pass-through: localhost is 404 like any non-pool URL. The runner sets NO_PROXY=localhost,127.0.0.1.
 - api.tavily.com POST /search and /extract are answered from the pool.
 - Any other URL in the pool is served as minimal HTML. Everything else is 404.
 - One JSONL line per search / extract / fetch is appended to ASSAY_SEARCH_LOG.
@@ -24,7 +28,8 @@ import traceback
 
 from mitmproxy import ctx, http
 
-LOCAL = {"localhost", "127.0.0.1", "::1"}
+# ponytail: port 9 is assumed dead (discard service off). Pick another if something listens there.
+UPSTREAM = ["upstream:http://127.0.0.1:9"]
 
 
 def norm(url):
@@ -44,6 +49,10 @@ class Proxy:
         self.log = open(os.environ["ASSAY_SEARCH_LOG"], "a", encoding="utf-8")
 
     def running(self):
+        if list(ctx.options.mode) != UPSTREAM:
+            ctx.log.error(f"assay proxy must run with --mode {UPSTREAM[0]}, refusing to start")
+            ctx.master.shutdown()
+            return
         # Default "eager" would connect upstream on CONNECT and break made-up pool hosts.
         ctx.options.connection_strategy = "lazy"
         # Non-HTTP bytes over CONNECT would otherwise be relayed raw to the real host
@@ -65,8 +74,6 @@ class Proxy:
     def route(self, flow):
         req = flow.request
         host = req.host.lower()  # URL host, not the spoofable Host header
-        if host in LOCAL:
-            return
         path = req.path.split("?")[0]
         if host == "api.tavily.com":
             if req.method == "POST" and path == "/search":

@@ -19,35 +19,71 @@ JIT = "https://docs-python.invalid/3.13/jit"
 FREE = "https://docs-python.invalid/3.13/free-threading"
 
 
-@pytest.fixture(scope="session")
-def proxy(tmp_path_factory):
-    tmp = tmp_path_factory.mktemp("proxy")
+MODE = "upstream:http://127.0.0.1:9"
+
+
+def free_port():
     with socket.socket() as s:
         s.bind(("127.0.0.1", 0))
-        port = s.getsockname()[1]
-    log = tmp / "search.jsonl"
-    out = open(tmp / "mitmdump.out", "w")
+        return s.getsockname()[1]
+
+
+def launch(tmp, script=ROOT / "backend" / "assay" / "proxy.py", mode=True):
+    """Start a real mitmdump. Returns (process, port, ca path, search log, output file)."""
+    port, log, out = free_port(), tmp / "search.jsonl", open(tmp / "mitmdump.out", "w")
     env = {**os.environ, "ASSAY_POOL_FILE": str(POOL), "ASSAY_SEARCH_LOG": str(log)}
-    p = subprocess.Popen(
-        [sys.executable, "-c", "from mitmproxy.tools.main import mitmdump; mitmdump()",
-         "-s", str(ROOT / "backend" / "assay" / "proxy.py"), "--listen-host", "127.0.0.1",
-         "--listen-port", str(port), "--set", f"confdir={tmp}"],
-        env=env, cwd=ROOT / "backend", stdout=out, stderr=subprocess.STDOUT,
-    )
-    ca = tmp / "mitmproxy-ca-cert.pem"
+    cmd = [sys.executable, "-c", "from mitmproxy.tools.main import mitmdump; mitmdump()",
+           "-s", str(script), "--listen-host", "127.0.0.1", "--listen-port", str(port),
+           "--set", f"confdir={tmp}", "--set", "connection_strategy=lazy", "--set", "rawtcp=false"]
+    if mode:
+        cmd += ["--mode", MODE]
+    p = subprocess.Popen(cmd, env=env, cwd=ROOT / "backend", stdout=out, stderr=subprocess.STDOUT)
+    return p, port, tmp / "mitmproxy-ca-cert.pem", log, out
+
+
+def wait_up(p, port, ca, tmp):
     for _ in range(300):
         try:
             socket.create_connection(("127.0.0.1", port), timeout=0.2).close()
             if ca.exists():
-                break
+                return
         except OSError:
             pass
         assert p.poll() is None, "mitmdump exited at startup:\n" + (tmp / "mitmdump.out").read_text()
         time.sleep(0.1)
-    else:
-        p.kill()
-        pytest.fail("proxy did not come up:\n" + (tmp / "mitmdump.out").read_text())
-    with httpx.Client(proxy=f"http://127.0.0.1:{port}", verify=ssl.create_default_context(cafile=str(ca)), timeout=10) as c:
+    p.kill()
+    pytest.fail("proxy did not come up:\n" + (tmp / "mitmdump.out").read_text())
+
+
+def client(port, ca):
+    return httpx.Client(proxy=f"http://127.0.0.1:{port}", verify=ssl.create_default_context(cafile=str(ca)), timeout=10)
+
+
+def sentinel():
+    """Local HTTP server that records every request it receives."""
+    hits = []
+
+    class H(BaseHTTPRequestHandler):
+        def do_GET(self):
+            hits.append(self.path)
+            self.send_response(200)
+            self.end_headers()
+            self.wfile.write(b"real-local-body")
+
+        def log_message(self, *a):
+            pass
+
+    srv = HTTPServer(("127.0.0.1", 0), H)
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    return srv, hits
+
+
+@pytest.fixture(scope="session")
+def proxy(tmp_path_factory):
+    tmp = tmp_path_factory.mktemp("proxy")
+    p, port, ca, log, out = launch(tmp)
+    wait_up(p, port, ca, tmp)
+    with client(port, ca) as c:
         c.log = log
         c.port = port
         yield c
@@ -128,24 +164,53 @@ def test_log_lines(proxy):
     ]
 
 
-def test_localhost_passthrough(proxy):
-    class H(BaseHTTPRequestHandler):
-        def do_GET(self):
-            self.send_response(200)
-            self.end_headers()
-            self.wfile.write(b"real-local-body")
-
-        def log_message(self, *a):
-            pass
-
-    srv = HTTPServer(("127.0.0.1", 0), H)
-    threading.Thread(target=srv.serve_forever, daemon=True).start()
+def test_localhost_is_not_passed_through(proxy):
+    srv, hits = sentinel()
     n = len(log_lines(proxy))
     r = proxy.get(f"http://127.0.0.1:{srv.server_port}/")
     srv.shutdown()
     srv.server_close()
-    assert r.text == "real-local-body"
-    assert len(log_lines(proxy)) == n
+    assert (r.status_code, r.text) == (404, "not in pool")
+    assert hits == []
+    assert len(log_lines(proxy)) == n + 1
+
+
+def test_broken_addon_fails_closed(tmp_path):
+    script = tmp_path / "proxy.py"
+    script.write_text((ROOT / "backend" / "assay" / "proxy.py").read_text())
+    p, port, ca, log, out = launch(tmp_path, script)
+    srv, hits = sentinel()
+    try:
+        wait_up(p, port, ca, tmp_path)
+        with client(port, ca) as c:
+            url = f"http://127.0.0.1:{srv.server_port}/"
+            assert (c.get(url).status_code, c.get(url).text) == (404, "not in pool")
+            script.write_text("def (:\n")  # hot reload fails and unloads the add-on
+            for _ in range(75):
+                r = c.get(url)
+                if r.text != "not in pool":
+                    break
+                time.sleep(0.2)
+            assert r.text != "not in pool", "add-on was never unloaded"
+            assert r.status_code != 200
+        assert hits == []
+    finally:
+        srv.shutdown()
+        srv.server_close()
+        p.kill()
+        p.wait()
+        out.close()
+
+
+def test_refuses_to_run_without_upstream_mode(tmp_path):
+    p, port, ca, log, out = launch(tmp_path, mode=False)
+    try:
+        p.wait(timeout=15)
+    finally:
+        p.kill()
+        p.wait()
+        out.close()
+    assert "upstream" in (tmp_path / "mitmdump.out").read_text()
 
 
 @pytest.mark.parametrize("path,body", [("/search", "{"), ("/search", "{}"), ("/extract", "{}")])
