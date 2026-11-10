@@ -44,13 +44,13 @@ def run_once(agent_dir: Path, task: Task, *, openai_base_url=None, openai_api_ke
         try:
             # ponytail: timeout kills the direct child only. Use start_new_session+killpg when wrapped agents spawn children.
             p = subprocess.run(_command(agent_dir / "run"), cwd=agent_dir, env=env,
-                               capture_output=True, text=True, timeout=timeout_s)
+                               capture_output=True, encoding="utf-8", errors="replace", timeout=timeout_s)
             if p.returncode != 0:
                 error = f"exit {p.returncode}: {p.stderr[-500:]}"
             elif not out.exists():
                 error = "no output file"
             else:
-                text = out.read_text(encoding="utf-8")
+                text = out.read_text(encoding="utf-8", errors="replace")
         except subprocess.TimeoutExpired:
             error = f"timeout after {timeout_s:g}s"
         except OSError as e:  # no `run`, not executable, bad interpreter

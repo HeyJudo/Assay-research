@@ -67,6 +67,14 @@ def test_missing_output(tmp_path):
     assert rec.steps[0].detail == "no output file"
 
 
+def test_non_utf8_bytes(tmp_path):
+    body = ("import os, sys\nopen(os.environ['ASSAY_OUTPUT'], 'wb').write(b'ok \\xff')\n"
+            "sys.stderr.buffer.write(b'bad \\xff')\nsys.exit(0)\n")
+    rec = runner.run_once(make_agent(tmp_path, body), TASK)
+    assert rec.status == "done"
+    assert rec.output.text == "ok \ufffd"
+
+
 def test_missing_run_command(tmp_path):
     rec = runner.run_once(tmp_path, TASK)  # folder exists, no `run` inside
     assert rec.status == "error"
