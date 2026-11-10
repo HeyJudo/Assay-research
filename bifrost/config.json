@@ -16,5 +16,21 @@
     "openai": {
       "keys": [{ "name": "openai-judge", "value": "env.OPENAI_API_KEY", "models": ["*"], "weight": 1.0 }]
     }
+  },
+  "governance": {
+    "virtual_keys": [
+      {
+        "id": "vk-judge",
+        "name": "judge",
+        "value": "env.BIFROST_JUDGE_VK",
+        "is_active": true,
+        "provider_configs": [
+          { "id": 1, "provider": "openai", "allowed_models": ["*"], "key_ids": ["*"], "weight": 1 }
+        ]
+      }
+    ],
+    "budgets": [
+      { "id": "budget-judge", "virtual_key_id": "vk-judge", "max_limit": 10.0, "reset_duration": "1M" }
+    ]
   }
 }
