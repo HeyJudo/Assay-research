@@ -20,6 +20,7 @@ import json
 import os
 import re
 import time
+import traceback
 
 from mitmproxy import ctx, http
 
@@ -51,13 +52,30 @@ class Proxy:
         self.log.flush()
 
     def request(self, flow: http.HTTPFlow):
+        # mitmproxy swallows hook exceptions and forwards the flow upstream, so fail closed.
+        try:
+            self.route(flow)
+        except Exception:
+            ctx.log.error(traceback.format_exc())
+            flow.response = http.Response.make(500, b"assay proxy error")
+
+    # Raw TCP/UDP (e.g. via CONNECT) must never reach a real host.
+    def tcp_start(self, flow):
+        flow.kill()
+
+    def udp_start(self, flow):
+        flow.kill()
+
+    def route(self, flow):
         req = flow.request
-        if req.pretty_host in LOCAL:
+        host = req.host.lower()  # URL host, not the spoofable Host header
+        if host in LOCAL:
             return
-        if req.pretty_host == "api.tavily.com":
-            if req.method == "POST" and req.path.split("?")[0] == "/search":
+        path = req.path.split("?")[0]
+        if host == "api.tavily.com":
+            if req.method == "POST" and path == "/search":
                 return self.search(flow)
-            if req.method == "POST" and req.path.split("?")[0] == "/extract":
+            if req.method == "POST" and path == "/extract":
                 return self.extract(flow)
             flow.response = http.Response.make(404, b"not found")
             return
@@ -105,7 +123,7 @@ class Proxy:
         )
 
     def fetch(self, flow):
-        url = flow.request.pretty_url
+        url = flow.request.url
         d = self.by_url.get(norm(url))
         self.write("fetch", [d["url"]] if d else [], url=url)
         if not d:

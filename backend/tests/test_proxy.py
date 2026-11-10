@@ -26,30 +26,33 @@ def proxy(tmp_path_factory):
         s.bind(("127.0.0.1", 0))
         port = s.getsockname()[1]
     log = tmp / "search.jsonl"
+    out = open(tmp / "mitmdump.out", "w")
     env = {**os.environ, "ASSAY_POOL_FILE": str(POOL), "ASSAY_SEARCH_LOG": str(log)}
     p = subprocess.Popen(
         [sys.executable, "-c", "from mitmproxy.tools.main import mitmdump; mitmdump()",
          "-s", str(ROOT / "backend" / "assay" / "proxy.py"), "--listen-host", "127.0.0.1",
          "--listen-port", str(port), "--set", f"confdir={tmp}"],
-        env=env, cwd=ROOT / "backend", stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+        env=env, cwd=ROOT / "backend", stdout=out, stderr=subprocess.STDOUT,
     )
     ca = tmp / "mitmproxy-ca-cert.pem"
-    for _ in range(100):
+    for _ in range(300):
         try:
             socket.create_connection(("127.0.0.1", port), timeout=0.2).close()
             if ca.exists():
                 break
         except OSError:
             pass
-        assert p.poll() is None, "mitmdump exited at startup"
+        assert p.poll() is None, "mitmdump exited at startup:\n" + (tmp / "mitmdump.out").read_text()
         time.sleep(0.1)
     else:
         p.kill()
-        pytest.fail("proxy did not come up")
+        pytest.fail("proxy did not come up:\n" + (tmp / "mitmdump.out").read_text())
     with httpx.Client(proxy=f"http://127.0.0.1:{port}", verify=ssl.create_default_context(cafile=str(ca)), timeout=10) as c:
         c.log = log
         yield c
     p.kill()
+    p.wait()
+    out.close()
 
 
 def search(c, **body):
@@ -139,5 +142,17 @@ def test_localhost_passthrough(proxy):
     n = len(log_lines(proxy))
     r = proxy.get(f"http://127.0.0.1:{srv.server_port}/")
     srv.shutdown()
+    srv.server_close()
     assert r.text == "real-local-body"
     assert len(log_lines(proxy)) == n
+
+
+@pytest.mark.parametrize("path,body", [("/search", "{"), ("/search", "{}"), ("/extract", "{}")])
+def test_malformed_tavily_body_fails_closed(proxy, path, body):
+    r = proxy.post("https://api.tavily.com" + path, content=body)
+    assert (r.status_code, r.text) == (500, "assay proxy error")
+
+
+def test_spoofed_localhost_host_header_is_not_passthrough(proxy):
+    r = proxy.get("https://pool-only.invalid/page", headers={"Host": "localhost"})
+    assert (r.status_code, r.text) == (404, "not in pool")
