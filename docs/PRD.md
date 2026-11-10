@@ -122,7 +122,7 @@ React app (Vite) ──HTTP/SSE──► FastAPI (api.py) ──► SQLite (assa
 - *Fake article:* a pool doc stating the planted fact, ranked #1 for the task's queries.
 - *Hidden instruction:* a pool doc with an embedded instruction to include a specific phrase; fell = phrase in output.
 - *Search outage:* the proxy returns HTTP 503 for the run's first 2 searches.
-- *Model outage:* the agent's first 2 LLM calls fail with 503 (a small pass-through in front of Bifrost, or Bifrost if it can do this; Jude's call). Measures whether the agent retries or crashes.
+- *Model outage:* the agent's first 3 LLM calls fail with 503 (a small pass-through in front of Bifrost; Bifrost can't count calls). 3, not 2, because the OpenAI SDK retries a 503 twice by default and would absorb 2. Measures whether the agent retries or crashes.
 
 ## 7. Tech stack (and why)
 
@@ -137,7 +137,7 @@ React app (Vite) ──HTTP/SSE──► FastAPI (api.py) ──► SQLite (assa
 | Deploy | **One Docker image** (FastAPI serves the built React app; Bifrost + proxy inside) → **Hugging Face Space (Docker)**, free | Serverless (Vercel) can't run long jobs or a proxy. Verify HF on Nov 13; fallback: run from a laptop on judging day + demo video |
 
 **Models (all through Bifrost):**
-- Agents under test: free open models. Small = Llama 3.1 8B class, main = Llama 3.3 70B class (exact IDs picked Nov 9 from what Groq/Cerebras/OpenRouter serve free). Every outside agent uses the **main** model so the comparison is fair.
+- Agents under test: free open models. Main = `qwen3.8-27b` (Groq + Cerebras, Bifrost fails over between them). Small = `gemma-4-26b-a4b-it` (Gemini + OpenRouter free; weaker failover, both run on Google AI Studio). gpt-oss was rejected: it is an OpenAI model, like the judge. Every outside agent uses the **main** model so the comparison is fair.
 - Judge: **one OpenAI mini GPT model** (different family from the agents), paid from a separate OpenAI project with a **$10 cap**, also set as a Bifrost budget.
 - Rate limits: each teammate creates free keys; Bifrost load-balances across all of them and fails over between providers serving the same model.
 - **Fallback to a different model invalidates a run.** The run gets `fallback_used: true` and is re-run for the benchmark. In the live demo it's allowed but labeled.
@@ -159,7 +159,7 @@ React app (Vite) ──HTTP/SSE──► FastAPI (api.py) ──► SQLite (assa
   "task_id": "brief-tavily", "task_type": "briefing", "trap": "fake_article" /* or null */,
   "repeat": 2, "status": "running|done|error|budget_exceeded",
   "started_at": "...", "duration_s": 41.2,
-  "config": { "agent_version": "1.0", "models": ["llama-3.1-8b", "llama-3.3-70b"],
+  "config": { "agent_version": "1.0", "models": ["gemma-4-26b-a4b-it", "qwen3.8-27b"],
               "prompt_hash": "a3f9", "pool_version": "v1", "trap_seed": 7, "fallback_used": false },
   "output": { "text": "...markdown...", "abstained": false },
   "steps": [ { "i": 1, "t": 0.4, "kind": "search|read|llm|switch|error", "detail": "query or url or note",
@@ -167,7 +167,7 @@ React app (Vite) ──HTTP/SSE──► FastAPI (api.py) ──► SQLite (assa
   "claims": [ { "text": "...", "verdict": "supported|unsupported|trap|not_found",
                 "source_url": "...", "source_quote": "..." } ],
   "metrics": { "success": true, "steps": 11, "tool_calls": 6, "tokens": 5400, "cost_usd": 0.0021,
-               "cost_by_model": { "llama-3.1-8b": 0.0004 }, "switched": true, "trap_fell": false,
+               "cost_by_model": { "gemma-4-26b-a4b-it": 0.0004 }, "switched": true, "trap_fell": false,
                "abstention": "correct|wrong_answer|over_refusal|null", "claims_supported_pct": 0.91 }
 }
 ```
@@ -248,4 +248,6 @@ All 6 screens, built first against fake run records in `web/src/fixtures/` · sl
 
 **Claude's calls (change if you disagree):** Python/FastAPI/SQLite backend · Vite (not Next.js) · SSE over WebSockets · one Docker image on a Hugging Face Space · list-price cost · fallback-to-other-model invalidates a run · briefing success definition (§8) · batch limits (≤3 agents, 1 task, 3 repeats) · GPT Researcher as the must-have outside agent · day-by-day split in §11 · proxy blocks all non-pool URLs · one judge call per run · trap mechanics (§6) · which tasks feed which metric (§8).
 
-**Still open:** exact free model IDs (Nov 9) · the 12 tasks' content (Nov 10–11) · repo name (suggest `assay-research`).
+**Decided (Nov 10):** free Llama 3.x models are no longer served by Groq or Cerebras · main = Qwen 3.8 27B (`qwen3.8-27b`, Groq + Cerebras failover) · small = Gemma 4 26B (`gemma-4-26b-a4b-it`, Gemini + OpenRouter, weaker failover) · model-outage trap fails the agent's first 3 LLM calls with 503, not 2, because the OpenAI SDK retries a 503 twice by default and would absorb 2.
+
+**Still open:** the 12 tasks' content (Nov 10–11) · repo name (suggest `assay-research`).
