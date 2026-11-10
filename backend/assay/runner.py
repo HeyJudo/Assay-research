@@ -47,7 +47,7 @@ def run_once(agent_dir: Path, task: Task, *, agent_version: str, models: list[st
 
     text, error = "", None
     t0 = time.monotonic()
-    with tempfile.TemporaryDirectory() as tmp:
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
         out = Path(tmp) / "output.md"
         env["ASSAY_OUTPUT"] = str(out)
         try:
@@ -58,16 +58,20 @@ def run_once(agent_dir: Path, task: Task, *, agent_version: str, models: list[st
                 else:
                     flags = dict(start_new_session=True)
                 p = subprocess.Popen(_command(agent_dir.resolve() / "run"), cwd=tmp, env=env,
-                                     stdout=so, stderr=se, **flags)
+                                     stdin=subprocess.DEVNULL, stdout=so, stderr=se, **flags)
                 try:
                     p.wait(timeout=timeout_s)
-                except subprocess.TimeoutExpired:
+                finally:
+                    # Always kill the tree: a surviving grandchild must not outlive the run.
                     if os.name == "nt":
                         subprocess.run(["taskkill", "/T", "/F", "/PID", str(p.pid)], capture_output=True)
                     else:
-                        os.killpg(p.pid, signal.SIGKILL)
-                    p.wait()
-                    raise
+                        try:
+                            os.killpg(p.pid, signal.SIGKILL)
+                        except ProcessLookupError:
+                            pass
+                    if p.poll() is None:
+                        p.wait(timeout=10)
             if p.returncode != 0:
                 stderr = (Path(tmp) / "stderr").read_text(encoding="utf-8", errors="replace")
                 error = f"exit {p.returncode}: {KEY_RE.sub('[redacted]', stderr)[-500:]}"

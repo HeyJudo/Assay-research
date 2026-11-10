@@ -163,3 +163,16 @@ def test_stderr_keys_redacted(tmp_path):
     detail = rec.steps[0].detail
     assert "[redacted]" in detail
     assert not any(s in detail for s in secrets)
+
+
+def test_surviving_grandchild_does_not_lose_record(tmp_path):
+    marker = tmp_path / "marker"
+    body = ("open(os.environ['ASSAY_OUTPUT'], 'w').write('ok')\n"
+            "import subprocess\n"
+            "subprocess.Popen([sys.executable, '-c', 'import sys, time; time.sleep(2); open(sys.argv[1], \"w\").write(\"x\")', "
+            f"{str(marker)!r}])\n")
+    rec = runner.run_once(make_agent(tmp_path, body), TASK, **CFG)
+    assert rec.status == "done"
+    time.sleep(3)
+    if os.name != "nt":
+        assert not marker.exists()
