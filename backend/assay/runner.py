@@ -53,6 +53,8 @@ def run_once(agent_dir: Path, task: Task, *, openai_base_url=None, openai_api_ke
                 text = out.read_text(encoding="utf-8")
         except subprocess.TimeoutExpired:
             error = f"timeout after {timeout_s:g}s"
+        except OSError as e:  # no `run`, not executable, bad interpreter
+            error = f"cannot start: {e}"
     duration = time.monotonic() - t0
 
     steps = [Step(i=1, t=duration, kind="error", detail=error, model=None, phase="write",

@@ -67,6 +67,12 @@ def test_missing_output(tmp_path):
     assert rec.steps[0].detail == "no output file"
 
 
+def test_missing_run_command(tmp_path):
+    rec = runner.run_once(tmp_path, TASK)  # folder exists, no `run` inside
+    assert rec.status == "error"
+    assert rec.steps[0].detail.startswith("cannot start:")
+
+
 def test_timeout(tmp_path):
     rec = runner.run_once(make_agent(tmp_path, "time.sleep(30)\n"), TASK, timeout_s=1)
     assert rec.status == "error"
