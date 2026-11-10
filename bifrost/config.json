@@ -2,19 +2,58 @@
   "$schema": "https://www.getbifrost.ai/schema",
   "providers": {
     "groq": {
-      "keys": [{ "name": "groq-1", "value": "env.GROQ_API_KEY", "models": ["*"], "weight": 1.0 }]
+      "keys": [
+        {
+          "name": "groq-1",
+          "value": "env.GROQ_API_KEY",
+          "models": ["qwen3.8-27b"],
+          "weight": 1.0,
+          "aliases": { "qwen3.8-27b": "qwen/qwen3.8-27b" }
+        }
+      ]
     },
     "openrouter": {
-      "keys": [{ "name": "openrouter-1", "value": "env.OPENROUTER_API_KEY", "models": ["*"], "weight": 1.0 }]
+      "keys": [
+        {
+          "name": "openrouter-1",
+          "value": "env.OPENROUTER_API_KEY",
+          "models": ["gemma-4-26b-a4b-it"],
+          "weight": 1.0,
+          "aliases": { "gemma-4-26b-a4b-it": "google/gemma-4-26b-a4b-it:free" }
+        }
+      ]
     },
     "gemini": {
-      "keys": [{ "name": "gemini-1", "value": "env.GEMINI_API_KEY", "models": ["*"], "weight": 1.0 }]
+      "keys": [
+        {
+          "name": "gemini-1",
+          "value": "env.GEMINI_API_KEY",
+          "models": ["gemma-4-26b-a4b-it"],
+          "weight": 1.0,
+          "aliases": { "gemma-4-26b-a4b-it": "gemma-4-26b-a4b-it" }
+        }
+      ]
     },
     "cerebras": {
-      "keys": [{ "name": "cerebras-1", "value": "env.CEREBRAS_API_KEY", "models": ["*"], "weight": 1.0 }]
+      "keys": [
+        {
+          "name": "cerebras-1",
+          "value": "env.CEREBRAS_API_KEY",
+          "models": ["qwen3.8-27b"],
+          "weight": 1.0,
+          "aliases": { "qwen3.8-27b": "qwen-3.8-27b" }
+        }
+      ]
     },
     "openai": {
-      "keys": [{ "name": "openai-judge", "value": "env.OPENAI_API_KEY", "models": ["*"], "weight": 1.0 }]
+      "keys": [
+        {
+          "name": "openai-judge",
+          "value": "env.OPENAI_API_KEY",
+          "models": ["*"],
+          "weight": 1.0
+        }
+      ]
     }
   },
   "governance": {
@@ -27,10 +66,119 @@
         "provider_configs": [
           { "id": 1, "provider": "openai", "allowed_models": ["*"], "key_ids": ["*"], "weight": 1 }
         ]
+      },
+      {
+        "id": "vk-run-1",
+        "name": "run-slot-1",
+        "value": "env.BIFROST_RUN_VK_1",
+        "is_active": true,
+        "provider_configs": [
+          { "provider": "groq", "allowed_models": ["qwen3.8-27b"], "key_ids": ["*"], "weight": 1 },
+          { "provider": "cerebras", "allowed_models": ["qwen3.8-27b"], "key_ids": ["*"], "weight": 1 },
+          { "provider": "gemini", "allowed_models": ["gemma-4-26b-a4b-it"], "key_ids": ["*"], "weight": 1 },
+          { "provider": "openrouter", "allowed_models": ["gemma-4-26b-a4b-it"], "key_ids": ["*"], "weight": 1 }
+        ]
+      },
+      {
+        "id": "vk-run-2",
+        "name": "run-slot-2",
+        "value": "env.BIFROST_RUN_VK_2",
+        "is_active": true,
+        "provider_configs": [
+          { "provider": "groq", "allowed_models": ["qwen3.8-27b"], "key_ids": ["*"], "weight": 1 },
+          { "provider": "cerebras", "allowed_models": ["qwen3.8-27b"], "key_ids": ["*"], "weight": 1 },
+          { "provider": "gemini", "allowed_models": ["gemma-4-26b-a4b-it"], "key_ids": ["*"], "weight": 1 },
+          { "provider": "openrouter", "allowed_models": ["gemma-4-26b-a4b-it"], "key_ids": ["*"], "weight": 1 }
+        ]
+      },
+      {
+        "id": "vk-run-3",
+        "name": "run-slot-3",
+        "value": "env.BIFROST_RUN_VK_3",
+        "is_active": true,
+        "provider_configs": [
+          { "provider": "groq", "allowed_models": ["qwen3.8-27b"], "key_ids": ["*"], "weight": 1 },
+          { "provider": "cerebras", "allowed_models": ["qwen3.8-27b"], "key_ids": ["*"], "weight": 1 },
+          { "provider": "gemini", "allowed_models": ["gemma-4-26b-a4b-it"], "key_ids": ["*"], "weight": 1 },
+          { "provider": "openrouter", "allowed_models": ["gemma-4-26b-a4b-it"], "key_ids": ["*"], "weight": 1 }
+        ]
+      },
+      {
+        "id": "vk-run-4",
+        "name": "run-slot-4",
+        "value": "env.BIFROST_RUN_VK_4",
+        "is_active": true,
+        "provider_configs": [
+          { "provider": "groq", "allowed_models": ["qwen3.8-27b"], "key_ids": ["*"], "weight": 1 },
+          { "provider": "cerebras", "allowed_models": ["qwen3.8-27b"], "key_ids": ["*"], "weight": 1 },
+          { "provider": "gemini", "allowed_models": ["gemma-4-26b-a4b-it"], "key_ids": ["*"], "weight": 1 },
+          { "provider": "openrouter", "allowed_models": ["gemma-4-26b-a4b-it"], "key_ids": ["*"], "weight": 1 }
+        ]
+      },
+      {
+        "id": "vk-run-5",
+        "name": "run-slot-5",
+        "value": "env.BIFROST_RUN_VK_5",
+        "is_active": true,
+        "provider_configs": [
+          { "provider": "groq", "allowed_models": ["qwen3.8-27b"], "key_ids": ["*"], "weight": 1 },
+          { "provider": "cerebras", "allowed_models": ["qwen3.8-27b"], "key_ids": ["*"], "weight": 1 },
+          { "provider": "gemini", "allowed_models": ["gemma-4-26b-a4b-it"], "key_ids": ["*"], "weight": 1 },
+          { "provider": "openrouter", "allowed_models": ["gemma-4-26b-a4b-it"], "key_ids": ["*"], "weight": 1 }
+        ]
+      },
+      {
+        "id": "vk-run-6",
+        "name": "run-slot-6",
+        "value": "env.BIFROST_RUN_VK_6",
+        "is_active": true,
+        "provider_configs": [
+          { "provider": "groq", "allowed_models": ["qwen3.8-27b"], "key_ids": ["*"], "weight": 1 },
+          { "provider": "cerebras", "allowed_models": ["qwen3.8-27b"], "key_ids": ["*"], "weight": 1 },
+          { "provider": "gemini", "allowed_models": ["gemma-4-26b-a4b-it"], "key_ids": ["*"], "weight": 1 },
+          { "provider": "openrouter", "allowed_models": ["gemma-4-26b-a4b-it"], "key_ids": ["*"], "weight": 1 }
+        ]
+      },
+      {
+        "id": "vk-run-7",
+        "name": "run-slot-7",
+        "value": "env.BIFROST_RUN_VK_7",
+        "is_active": true,
+        "provider_configs": [
+          { "provider": "groq", "allowed_models": ["qwen3.8-27b"], "key_ids": ["*"], "weight": 1 },
+          { "provider": "cerebras", "allowed_models": ["qwen3.8-27b"], "key_ids": ["*"], "weight": 1 },
+          { "provider": "gemini", "allowed_models": ["gemma-4-26b-a4b-it"], "key_ids": ["*"], "weight": 1 },
+          { "provider": "openrouter", "allowed_models": ["gemma-4-26b-a4b-it"], "key_ids": ["*"], "weight": 1 }
+        ]
+      },
+      {
+        "id": "vk-run-8",
+        "name": "run-slot-8",
+        "value": "env.BIFROST_RUN_VK_8",
+        "is_active": true,
+        "provider_configs": [
+          { "provider": "groq", "allowed_models": ["qwen3.8-27b"], "key_ids": ["*"], "weight": 1 },
+          { "provider": "cerebras", "allowed_models": ["qwen3.8-27b"], "key_ids": ["*"], "weight": 1 },
+          { "provider": "gemini", "allowed_models": ["gemma-4-26b-a4b-it"], "key_ids": ["*"], "weight": 1 },
+          { "provider": "openrouter", "allowed_models": ["gemma-4-26b-a4b-it"], "key_ids": ["*"], "weight": 1 }
+        ]
+      },
+      {
+        "id": "vk-run-9",
+        "name": "run-slot-9",
+        "value": "env.BIFROST_RUN_VK_9",
+        "is_active": true,
+        "provider_configs": [
+          { "provider": "groq", "allowed_models": ["qwen3.8-27b"], "key_ids": ["*"], "weight": 1 },
+          { "provider": "cerebras", "allowed_models": ["qwen3.8-27b"], "key_ids": ["*"], "weight": 1 },
+          { "provider": "gemini", "allowed_models": ["gemma-4-26b-a4b-it"], "key_ids": ["*"], "weight": 1 },
+          { "provider": "openrouter", "allowed_models": ["gemma-4-26b-a4b-it"], "key_ids": ["*"], "weight": 1 }
+        ]
       }
     ],
     "budgets": [
       { "id": "budget-judge", "virtual_key_id": "vk-judge", "max_limit": 10.0, "reset_duration": "1M" }
     ]
-  }
+  },
+  "client": { "enforce_auth_on_inference": true }
 }
