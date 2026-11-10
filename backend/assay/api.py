@@ -1,6 +1,7 @@
 """Read-only API. Runs come from SQLite (seeded from fixtures when empty). Leaderboard, agents, tasks and compare still read fixtures. POST and SSE endpoints come later (PRD §8)."""
 
 import json
+import os
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -25,7 +26,8 @@ LEADERBOARD = load("leaderboard.json", LeaderboardRow)
 
 @asynccontextmanager
 async def lifespan(_):
-    store.seed_if_empty()
+    if os.environ.get("ASSAY_SEED_FIXTURES") == "1":
+        store.seed_if_empty()
     yield
 
 

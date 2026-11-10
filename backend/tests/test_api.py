@@ -10,8 +10,16 @@ FIXTURE_IDS = ["run_001", "run_002", "run_003", "run_004"]
 @pytest.fixture
 def client(tmp_path, monkeypatch):
     monkeypatch.setenv("ASSAY_DB", str(tmp_path / "t.db"))
+    monkeypatch.setenv("ASSAY_SEED_FIXTURES", "1")
     with TestClient(app) as c:
         yield c
+
+
+def test_no_seed_by_default(tmp_path, monkeypatch):
+    monkeypatch.setenv("ASSAY_DB", str(tmp_path / "t.db"))
+    monkeypatch.delenv("ASSAY_SEED_FIXTURES", raising=False)
+    with TestClient(app) as c:
+        assert c.get("/api/runs").json() == []
 
 
 def test_list_seeded_without_steps(client):

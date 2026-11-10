@@ -105,6 +105,8 @@ cd backend
 uv run uvicorn assay.api:app --reload
 ```
 
+Set `ASSAY_SEED_FIXTURES=1` to load the fixture runs into an empty DB for frontend work.
+
 **Bifrost alone** (UI at http://localhost:8080, reads `bifrost/config.json`; export the keys from `.env` first):
 
 ```bash
