@@ -120,3 +120,11 @@ def test_timeout_kills_grandchild(tmp_path):
     assert rec.duration_s < 10
     time.sleep(5)
     assert not marker.exists()
+
+
+def test_cwd_is_outside_repo(tmp_path):
+    agent = make_agent(tmp_path, "open(os.environ['ASSAY_OUTPUT'], 'w').write(os.getcwd())\n")
+    rec = runner.run_once(agent, TASK)
+    cwd = Path(rec.output.text).resolve()
+    assert not cwd.is_relative_to(Path(runner.__file__).resolve().parents[2])
+    assert cwd != agent.resolve()

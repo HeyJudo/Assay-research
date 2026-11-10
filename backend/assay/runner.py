@@ -51,7 +51,7 @@ def run_once(agent_dir: Path, task: Task, *, openai_base_url=None, openai_api_ke
                     flags = dict(creationflags=subprocess.CREATE_NEW_PROCESS_GROUP)
                 else:
                     flags = dict(start_new_session=True)
-                p = subprocess.Popen(_command(agent_dir / "run"), cwd=agent_dir, env=env,
+                p = subprocess.Popen(_command(agent_dir.resolve() / "run"), cwd=tmp, env=env,
                                      stdout=so, stderr=se, **flags)
                 try:
                     p.wait(timeout=timeout_s)
