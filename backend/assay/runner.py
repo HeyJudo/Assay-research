@@ -105,14 +105,13 @@ if __name__ == "__main__":
     ap.add_argument("--models", required=True, help="comma-separated")
     ap.add_argument("--prompt-hash", required=True)
     ap.add_argument("--openai-base-url")
-    ap.add_argument("--openai-api-key")
     ap.add_argument("--https-proxy")
     ap.add_argument("--ca-cert")
     ap.add_argument("--timeout", type=float, default=600)
     a = ap.parse_args()
     rec = run_once(a.agent.resolve(), Task.model_validate_json(a.task.read_text(encoding="utf-8")),
                    agent_version=a.agent_version, models=a.models.split(","), prompt_hash=a.prompt_hash,
-                   openai_base_url=a.openai_base_url, openai_api_key=a.openai_api_key,
+                   openai_base_url=a.openai_base_url, openai_api_key=os.environ.get("ASSAY_AGENT_API_KEY"),
                    https_proxy=a.https_proxy, ca_cert=a.ca_cert, timeout_s=a.timeout)
     store.save(rec)
     print(rec.id)

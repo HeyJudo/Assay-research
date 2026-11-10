@@ -1,4 +1,5 @@
 import json
+import os
 import subprocess
 import time
 import sys
@@ -141,3 +142,15 @@ def test_config_required(field):
 def test_config_recorded():
     rec = runner.run_once(STUB, TASK, agent_version="9", models=["m1", "m2"], prompt_hash="abc")
     assert (rec.config.agent_version, rec.config.models, rec.config.prompt_hash) == ("9", ["m1", "m2"], "abc")
+
+
+def test_cli_agent_key_from_env(tmp_path, monkeypatch):
+    agent = make_agent(tmp_path, "open(os.environ['ASSAY_OUTPUT'], 'w').write(os.environ.get('OPENAI_API_KEY', 'missing'))\n")
+    db = tmp_path / "t.db"
+    monkeypatch.setenv("ASSAY_DB", str(db))
+    out = subprocess.run(
+        [sys.executable, "-m", "assay.runner", "--agent", str(agent), "--task", str(PRACTICE),
+         "--agent-version", "0.1", "--models", "a", "--prompt-hash", "h"],
+        cwd=BACKEND, env={**os.environ, "ASSAY_DB": str(db), "ASSAY_AGENT_API_KEY": "sk-bf-virtual"},
+        capture_output=True, text=True, check=True)
+    assert store.get(out.stdout.strip()).output.text == "sk-bf-virtual"
