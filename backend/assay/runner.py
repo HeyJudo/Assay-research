@@ -18,7 +18,9 @@ OS_BASICS = ["PATH", "SYSTEMROOT", "COMSPEC", "PATHEXT", "TEMP", "TMP", "HOME", 
 
 
 def _command(run: Path) -> list[str]:
-    # ponytail: Windows can't exec shebangs, so python shebangs go through our interpreter. Outside agents get a shell wrapper.
+    # ponytail: Windows can't exec shebangs, so python shebangs go through our interpreter. Elsewhere exec directly so the agent's own venv shebang is honored.
+    if os.name != "nt":
+        return [str(run)]
     first = run.read_text(encoding="utf-8", errors="ignore").splitlines()[:1]
     if first and first[0].startswith("#!") and "python" in first[0]:
         return [sys.executable, str(run)]

@@ -19,7 +19,16 @@ def make_agent(tmp_path, body):
     d = tmp_path / "fake"
     d.mkdir()
     (d / "run").write_text("#!/usr/bin/env python3\nimport os, sys, json, time\n" + body)
+    (d / "run").chmod(0o755)
     return d
+
+
+def test_command_rewrites_python_shebang_only_on_windows(tmp_path, monkeypatch):
+    run = make_agent(tmp_path, "pass\n") / "run"
+    monkeypatch.setattr(runner.os, "name", "posix")
+    assert runner._command(run) == [str(run)]
+    monkeypatch.setattr(runner.os, "name", "nt")
+    assert runner._command(run) == [sys.executable, str(run)]
 
 
 def test_stub_success():
