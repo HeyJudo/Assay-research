@@ -28,9 +28,12 @@ def _command(run: Path) -> list[str]:
     return [str(run)]
 
 
-def run_once(agent_dir: Path, task: Task, *, openai_base_url=None, openai_api_key=None,
+def run_once(agent_dir: Path, task: Task, *, agent_version: str, models: list[str], prompt_hash: str,
+             openai_base_url=None, openai_api_key=None,
              https_proxy=None, ca_cert=None, timeout_s: float = 600, batch_id: str | None = None,
              repeat: int = 1, trap=None, trap_seed=None, pool_version="v1") -> RunRecord:
+    if not (agent_version and models and prompt_hash):
+        raise ValueError("agent_version, models and prompt_hash are required")
     started = datetime.now(timezone.utc)
     env = {k: os.environ[k] for k in OS_BASICS if k in os.environ}
     env.update(ASSAY_TASK=task.prompt, ASSAY_AS_OF=task.as_of_date)
@@ -82,8 +85,7 @@ def run_once(agent_dir: Path, task: Task, *, openai_base_url=None, openai_api_ke
         agent_id=agent_dir.name, task_id=task.id, task_type=task.type, trap=trap, repeat=repeat,
         status="error" if error else "done",
         started_at=started.strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z", duration_s=duration,
-        # ponytail: filled from agent metadata when the batch runner lands.
-        config=RunConfig(agent_version="", models=[], prompt_hash="", pool_version=pool_version,
+        config=RunConfig(agent_version=agent_version, models=models, prompt_hash=prompt_hash, pool_version=pool_version,
                          trap_seed=trap_seed, fallback_used=False),
         # ponytail: the grader decides abstained.
         output=RunOutput(text=text, abstained=False),
@@ -99,6 +101,9 @@ if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--agent", required=True, type=Path)
     ap.add_argument("--task", required=True, type=Path)
+    ap.add_argument("--agent-version", required=True)
+    ap.add_argument("--models", required=True, help="comma-separated")
+    ap.add_argument("--prompt-hash", required=True)
     ap.add_argument("--openai-base-url")
     ap.add_argument("--openai-api-key")
     ap.add_argument("--https-proxy")
@@ -106,6 +111,7 @@ if __name__ == "__main__":
     ap.add_argument("--timeout", type=float, default=600)
     a = ap.parse_args()
     rec = run_once(a.agent.resolve(), Task.model_validate_json(a.task.read_text(encoding="utf-8")),
+                   agent_version=a.agent_version, models=a.models.split(","), prompt_hash=a.prompt_hash,
                    openai_base_url=a.openai_base_url, openai_api_key=a.openai_api_key,
                    https_proxy=a.https_proxy, ca_cert=a.ca_cert, timeout_s=a.timeout)
     store.save(rec)

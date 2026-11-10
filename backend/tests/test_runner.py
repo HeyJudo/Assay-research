@@ -12,6 +12,7 @@ from assay.models import RunRecord, Task
 BACKEND = Path(__file__).resolve().parents[1]
 STUB = BACKEND / "agents" / "stub"
 PRACTICE = BACKEND.parent / "data" / "practice" / "tasks" / "practice-python3-year.json"
+CFG = dict(agent_version="0.1", models=["stub"], prompt_hash="stub")
 TASK = Task(id="t1", type="fact", prompt="What is 2+2?", as_of_date="2026-01-02",
             answer="4", trap_twin=None, notes="")
 
@@ -33,7 +34,7 @@ def test_command_rewrites_python_shebang_only_on_windows(tmp_path, monkeypatch):
 
 
 def test_stub_success():
-    rec = runner.run_once(STUB, TASK)
+    rec = runner.run_once(STUB, TASK, **CFG)
     RunRecord.model_validate(rec.model_dump())
     assert rec.status == "done"
     assert "https://example.com/pool/stub-source" in rec.output.text
@@ -46,14 +47,14 @@ def test_env_routing_and_allowlist(tmp_path, monkeypatch):
     monkeypatch.setenv("TAVILY_API_KEY", "parent-secret")
     monkeypatch.setenv("OPENAI_API_KEY", "parent-openai")
     agent = make_agent(tmp_path, "open(os.environ['ASSAY_OUTPUT'],'w').write(json.dumps(dict(os.environ)))\n")
-    rec = runner.run_once(agent, TASK)
+    rec = runner.run_once(agent, TASK, **CFG)
     env = json.loads(rec.output.text)
     assert env["ASSAY_TASK"] == "What is 2+2?"
     assert env["ASSAY_AS_OF"] == "2026-01-02"
     assert env["ASSAY_OUTPUT"]
     assert "TAVILY_API_KEY" not in env and "OPENAI_API_KEY" not in env
 
-    rec = runner.run_once(agent, TASK, openai_base_url="http://b/v1", openai_api_key="k",
+    rec = runner.run_once(agent, TASK, **CFG, openai_base_url="http://b/v1", openai_api_key="k",
                           https_proxy="http://p:1", ca_cert="/ca.pem")
     env = json.loads(rec.output.text)
     assert env["OPENAI_BASE_URL"] == "http://b/v1"
@@ -65,14 +66,14 @@ def test_env_routing_and_allowlist(tmp_path, monkeypatch):
 
 
 def test_nonzero_exit(tmp_path):
-    rec = runner.run_once(make_agent(tmp_path, "sys.stderr.write('boom')\nsys.exit(3)\n"), TASK)
+    rec = runner.run_once(make_agent(tmp_path, "sys.stderr.write('boom')\nsys.exit(3)\n"), TASK, **CFG)
     assert rec.status == "error" and rec.output.text == ""
     assert rec.steps[0].kind == "error"
     assert "exit 3" in rec.steps[0].detail and "boom" in rec.steps[0].detail
 
 
 def test_missing_output(tmp_path):
-    rec = runner.run_once(make_agent(tmp_path, "pass\n"), TASK)
+    rec = runner.run_once(make_agent(tmp_path, "pass\n"), TASK, **CFG)
     assert rec.status == "error"
     assert rec.steps[0].detail == "no output file"
 
@@ -80,19 +81,19 @@ def test_missing_output(tmp_path):
 def test_non_utf8_bytes(tmp_path):
     body = ("import os, sys\nopen(os.environ['ASSAY_OUTPUT'], 'wb').write(b'ok \\xff')\n"
             "sys.stderr.buffer.write(b'bad \\xff')\nsys.exit(0)\n")
-    rec = runner.run_once(make_agent(tmp_path, body), TASK)
+    rec = runner.run_once(make_agent(tmp_path, body), TASK, **CFG)
     assert rec.status == "done"
     assert rec.output.text == "ok \ufffd"
 
 
 def test_missing_run_command(tmp_path):
-    rec = runner.run_once(tmp_path, TASK)  # folder exists, no `run` inside
+    rec = runner.run_once(tmp_path, TASK, **CFG)  # folder exists, no `run` inside
     assert rec.status == "error"
     assert rec.steps[0].detail.startswith("cannot start:")
 
 
 def test_timeout(tmp_path):
-    rec = runner.run_once(make_agent(tmp_path, "time.sleep(30)\n"), TASK, timeout_s=1)
+    rec = runner.run_once(make_agent(tmp_path, "time.sleep(30)\n"), TASK, **CFG, timeout_s=1)
     assert rec.status == "error"
     assert rec.steps[0].detail == "timeout after 1s"
     assert rec.duration_s < 10
@@ -102,7 +103,8 @@ def test_cli(tmp_path, monkeypatch):
     db = tmp_path / "t.db"
     monkeypatch.setenv("ASSAY_DB", str(db))
     out = subprocess.run(
-        [sys.executable, "-m", "assay.runner", "--agent", str(STUB), "--task", str(PRACTICE)],
+        [sys.executable, "-m", "assay.runner", "--agent", str(STUB), "--task", str(PRACTICE),
+         "--agent-version", "0.1", "--models", "a,b", "--prompt-hash", "h"],
         cwd=BACKEND, env={**__import__("os").environ, "ASSAY_DB": str(db)},
         capture_output=True, text=True, check=True)
     rec = store.get(out.stdout.strip())
@@ -115,7 +117,7 @@ def test_timeout_kills_grandchild(tmp_path):
             "subprocess.Popen([sys.executable, '-c', 'import sys, time; time.sleep(3); open(sys.argv[1], \"w\").write(\"x\")', "
             f"{str(marker)!r}])\n"
             "time.sleep(30)\n")
-    rec = runner.run_once(make_agent(tmp_path, body), TASK, timeout_s=1)
+    rec = runner.run_once(make_agent(tmp_path, body), TASK, **CFG, timeout_s=1)
     assert rec.status == "error"
     assert rec.duration_s < 10
     time.sleep(5)
@@ -124,7 +126,18 @@ def test_timeout_kills_grandchild(tmp_path):
 
 def test_cwd_is_outside_repo(tmp_path):
     agent = make_agent(tmp_path, "open(os.environ['ASSAY_OUTPUT'], 'w').write(os.getcwd())\n")
-    rec = runner.run_once(agent, TASK)
+    rec = runner.run_once(agent, TASK, **CFG)
     cwd = Path(rec.output.text).resolve()
     assert not cwd.is_relative_to(Path(runner.__file__).resolve().parents[2])
     assert cwd != agent.resolve()
+
+
+@pytest.mark.parametrize("field", ["agent_version", "models", "prompt_hash"])
+def test_config_required(field):
+    with pytest.raises(ValueError):
+        runner.run_once(STUB, TASK, **{**CFG, field: "" if field != "models" else []})
+
+
+def test_config_recorded():
+    rec = runner.run_once(STUB, TASK, agent_version="9", models=["m1", "m2"], prompt_hash="abc")
+    assert (rec.config.agent_version, rec.config.models, rec.config.prompt_hash) == ("9", ["m1", "m2"], "abc")
