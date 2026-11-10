@@ -45,6 +45,20 @@ def words(text):
     return set(re.findall(r"\w+", text.lower()))
 
 
+class BadRequest(Exception):
+    pass
+
+
+def parse(flow):
+    try:
+        body = flow.request.json()
+    except ValueError:
+        raise BadRequest("Invalid JSON body")
+    if not isinstance(body, dict):
+        raise BadRequest("Body must be a JSON object")
+    return body
+
+
 class Proxy:
     def __init__(self):
         # KeyError on a missing env var: fail loudly at startup.
@@ -72,6 +86,9 @@ class Proxy:
         # mitmproxy swallows hook exceptions and forwards the flow upstream, so fail closed.
         try:
             self.route(flow)
+        except BadRequest as e:
+            flow.response = http.Response.make(
+                400, json.dumps({"detail": {"error": str(e)}}), {"Content-Type": "application/json"})
         except Exception:
             ctx.log.error(traceback.format_exc())
             flow.response = http.Response.make(500, b"assay proxy error")
@@ -91,8 +108,13 @@ class Proxy:
 
     def search(self, flow):
         t0 = time.time()
-        body = flow.request.json()
-        query, n = body["query"], body.get("max_results", 5)
+        body = parse(flow)
+        query, n = body.get("query"), body.get("max_results", 5)
+        if not isinstance(query, str) or not query.strip():
+            raise BadRequest("Query is missing or empty")
+        if type(n) is not int:
+            raise BadRequest("max_results must be an integer")
+        n = max(0, min(n, 20))
         q = words(query)
         # ponytail: naive keyword overlap, upgrade to BM25 if ranking quality matters
         scored = [(len(q & words(d["title"] + " " + d["content"])), d) for d in self.docs]
@@ -114,8 +136,10 @@ class Proxy:
 
     def extract(self, flow):
         t0 = time.time()
-        urls = flow.request.json()["urls"]
+        urls = parse(flow).get("urls")
         urls = [urls] if isinstance(urls, str) else urls
+        if not urls or not isinstance(urls, list) or not all(isinstance(u, str) and u for u in urls):
+            raise BadRequest("urls must be a non-empty string or list of strings")
         found = [self.by_url[norm(u)] for u in urls if norm(u) in self.by_url]
         failed = [u for u in urls if norm(u) not in self.by_url]
         self.write("extract", [d["url"] for d in found], urls=urls)

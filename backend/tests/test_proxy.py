@@ -226,9 +226,34 @@ def test_refuses_to_run_without_upstream_mode(tmp_path):
     assert "upstream" in (tmp_path / "mitmdump.out").read_text()
 
 
-@pytest.mark.parametrize("path,body", [("/search", "{"), ("/search", "{}"), ("/extract", "{}")])
-def test_malformed_tavily_body_fails_closed(proxy, path, body):
+BAD = [
+    ("/search", "{"), ("/search", "[]"), ("/search", "{}"), ("/search", '{"query": ""}'),
+    ("/search", '{"query": "   "}'), ("/search", '{"query": 5}'),
+    ("/search", '{"query": "x", "max_results": "3"}'), ("/search", '{"query": "x", "max_results": true}'),
+    ("/search", '{"query": "x", "max_results": 2.5}'),
+    ("/extract", "{"), ("/extract", "{}"), ("/extract", '{"urls": 5}'), ("/extract", '{"urls": []}'),
+    ("/extract", '{"urls": [1]}'), ("/extract", '{"urls": ""}'),
+]
+
+
+@pytest.mark.parametrize("path,body", BAD)
+def test_bad_tavily_request_is_400(proxy, path, body):
+    n = len(log_lines(proxy))
     r = proxy.post("https://api.tavily.com" + path, content=body)
+    assert r.status_code == 400
+    assert isinstance(r.json()["detail"]["error"], str) and r.json()["detail"]["error"]
+    assert len(log_lines(proxy)) == n
+
+
+def test_max_results_is_clamped(proxy):
+    assert search(proxy, query="python", max_results=0).json()["results"] == []
+    assert search(proxy, query="python", max_results=-3).json()["results"] == []
+    assert len(search(proxy, query="python", max_results=1000).json()["results"]) == 5
+
+
+def test_unexpected_error_still_fails_closed(proxy):
+    # Deeply nested JSON blows the parser's stack (RecursionError), which is not a validation error.
+    r = proxy.post("https://api.tavily.com/search", content="[" * 100000)
     assert (r.status_code, r.text) == (500, "assay proxy error")
 
 
