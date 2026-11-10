@@ -176,3 +176,15 @@ def test_surviving_grandchild_does_not_lose_record(tmp_path):
     time.sleep(3)
     if os.name != "nt":
         assert not marker.exists()
+
+
+def test_redaction_keeps_words_and_hides_literal_key(tmp_path):
+    rec = runner.run_once(make_agent(tmp_path, "sys.stderr.write('task-123 risk-free')\nsys.exit(1)\n"), TASK, **CFG)
+    assert "task-123" in rec.steps[0].detail and "risk-free" in rec.steps[0].detail
+
+
+def test_literal_agent_key_redacted(tmp_path):
+    rec = runner.run_once(make_agent(tmp_path, "sys.stderr.write('key plainsecret123 end')\nsys.exit(1)\n"),
+                          TASK, **CFG, openai_api_key="plainsecret123")
+    assert "plainsecret123" not in rec.steps[0].detail
+    assert "[redacted]" in rec.steps[0].detail
