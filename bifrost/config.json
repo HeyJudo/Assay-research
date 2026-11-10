@@ -29,8 +29,7 @@
           "name": "gemini-1",
           "value": "env.GEMINI_API_KEY",
           "models": ["gemma-4-26b-a4b-it"],
-          "weight": 1.0,
-          "aliases": { "gemma-4-26b-a4b-it": "gemma-4-26b-a4b-it" }
+          "weight": 1.0
         }
       ]
     },
