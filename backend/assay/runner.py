@@ -35,7 +35,7 @@ def run_once(agent_dir: Path, task: Task, *, agent_version: str, models: list[st
              openai_base_url=None, openai_api_key=None,
              https_proxy=None, ca_cert=None, timeout_s: float = 600, batch_id: str | None = None,
              repeat: int = 1, trap=None, trap_seed=None, pool_version="v1") -> RunRecord:
-    if not (agent_version and models and prompt_hash):
+    if not (agent_version and models and prompt_hash) or not all(m.strip() for m in models):
         raise ValueError("agent_version, models and prompt_hash are required")
     started = datetime.now(timezone.utc)
     env = {k: os.environ[k] for k in OS_BASICS if k in os.environ}
@@ -119,7 +119,7 @@ if __name__ == "__main__":
     ap.add_argument("--timeout", type=float, default=600)
     a = ap.parse_args()
     rec = run_once(a.agent.resolve(), Task.model_validate_json(a.task.read_text(encoding="utf-8")),
-                   agent_version=a.agent_version, models=a.models.split(","), prompt_hash=a.prompt_hash,
+                   agent_version=a.agent_version, models=[m.strip() for m in a.models.split(",") if m.strip()], prompt_hash=a.prompt_hash,
                    openai_base_url=a.openai_base_url, openai_api_key=os.environ.get("ASSAY_AGENT_API_KEY"),
                    https_proxy=a.https_proxy, ca_cert=a.ca_cert, timeout_s=a.timeout)
     store.save(rec)

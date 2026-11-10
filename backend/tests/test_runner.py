@@ -188,3 +188,18 @@ def test_literal_agent_key_redacted(tmp_path):
                           TASK, **CFG, openai_api_key="plainsecret123")
     assert "plainsecret123" not in rec.steps[0].detail
     assert "[redacted]" in rec.steps[0].detail
+
+
+def test_empty_model_name_rejected():
+    with pytest.raises(ValueError):
+        runner.run_once(STUB, TASK, **{**CFG, "models": ["a", ""]})
+
+
+def test_cli_drops_empty_models(tmp_path, monkeypatch):
+    db = tmp_path / "t.db"
+    monkeypatch.setenv("ASSAY_DB", str(db))
+    out = subprocess.run(
+        [sys.executable, "-m", "assay.runner", "--agent", str(STUB), "--task", str(PRACTICE),
+         "--agent-version", "0.1", "--models", "a,,b", "--prompt-hash", "h"],
+        cwd=BACKEND, env={**os.environ, "ASSAY_DB": str(db)}, capture_output=True, text=True, check=True)
+    assert store.get(out.stdout.strip()).config.models == ["a", "b"]
