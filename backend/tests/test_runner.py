@@ -235,3 +235,37 @@ def test_runner_through_real_proxy(tmp_path):
         p.kill()
         p.wait()
         out.close()
+
+
+def test_model_outage_routes_through_outage_proxy(tmp_path):
+    import test_outage as to
+    srv, hits = to.sentinel()
+    p, port = to.launch(tmp_path, f"reverse:http://127.0.0.1:{srv.server_port}")
+    try:
+        to.wait_up(p, port)
+        task = TASK.model_copy(update={"prompt": json.dumps([{"op": "llm", "arg": "hi"}] * 4)})
+        rec = runner.run_once(BACKEND / "tests" / "agents" / "searcher", task, **CFG, trap="model_outage",
+                              openai_base_url=f"http://127.0.0.1:{srv.server_port}/v1", openai_api_key="k",
+                              llm_outage_url=f"http://127.0.0.1:{port}")
+        assert rec.status == "done", rec.steps
+        assert json.loads(rec.output.text) == [503, 503, 503, 200]
+        assert hits == ["/v1/chat/completions"]
+        assert rec.trap == "model_outage"
+    finally:
+        p.kill()
+        p.wait()
+        srv.shutdown()
+
+
+def test_model_outage_requires_url():
+    with pytest.raises(ValueError):
+        runner.run_once(STUB, TASK, **CFG, trap="model_outage", openai_base_url="http://b/v1")
+    with pytest.raises(ValueError):
+        runner.run_once(STUB, TASK, **CFG, trap="model_outage", llm_outage_url="http://o:1")
+
+
+def test_other_traps_keep_base_url(tmp_path):
+    agent = make_agent(tmp_path, "open(os.environ['ASSAY_OUTPUT'],'w').write(os.environ['OPENAI_BASE_URL'])\n")
+    rec = runner.run_once(agent, TASK, **CFG, trap="search_outage", openai_base_url="http://b/v1",
+                          llm_outage_url="http://o:1")
+    assert rec.output.text == "http://b/v1"
