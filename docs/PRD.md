@@ -1,7 +1,7 @@
 # Assay: PRD v3 (build version)
 
 **Tagline:** Know which research agent to trust, and why.
-**Status (Nov 9):** idea, flow and screens locked. Search proxy proven in a test run. Nothing else built.
+**Status (Nov 10):** lead lane: day-0 scaffold, search proxy, runner + SQLite store, and Bifrost (models, run-slot keys, judge budget) are merged and tested. Not yet connected end to end. Briefing Agent, graders and real screens not started.
 **Tracks:** PS02 Bifrost (primary, research-agent category) + PS05 Tavily (integration checkbox).
 **Deadline:** submit Nov 15 by afternoon (hard limit 11:59 PM). Live judging Nov 29.
 This is the only PRD. It replaces v1 and v2.
@@ -219,8 +219,8 @@ All 6 screens, built first against fake run records in `web/src/fixtures/` · sl
 
 | Day | Jude | Backend | Frontend | **Gate (end of day)** |
 |---|---|---|---|---|
-| **Sun Nov 9** | Repo skeleton (`backend/`, `web/`, `data/`, `bifrost/`), docker-compose with Bifrost, FastAPI serving 4 fake run records, Vite + shadcn scaffold with 6 empty routes, `.env.example`, README stub | Install Python 3.12 + uv + Node 20; make free keys (Groq, OpenRouter, Gemini, Cerebras) + redeem Tavily `GEEKROOM2` | Install Node 20; same keys; read the fixtures | Jude: `docker compose up` shows fake data. Frontend: `npm run dev` shows fixtures. Backend: Bifrost runs via `npx -y @maximhq/bifrost` |
-| Mon Nov 10 | Proxy in repo; runner runs one agent on one task; record saved | Baseline agent passes the contract on a practice task | Home + Receipt on fixtures | **Baseline runs 1 task end to end: proxy → Bifrost → record → receipt** |
+| **Sun Nov 9** | ✅ Repo skeleton (`backend/`, `web/`, `data/`, `bifrost/`), docker-compose with Bifrost, FastAPI serving 4 fake run records, Vite + shadcn scaffold with 6 empty routes, `.env.example`, README stub | Install Python 3.12 + uv + Node 20; make free keys (Groq, OpenRouter, Gemini, Cerebras) + redeem Tavily `GEEKROOM2` | Install Node 20; same keys; read the fixtures | Jude: `docker compose up` shows fake data. Frontend: `npm run dev` shows fixtures. Backend: Bifrost runs via `npx -y @maximhq/bifrost` |
+| Mon Nov 10 | ✅ Proxy in repo · ✅ runner runs one agent (stub) on one task, record saved · ✅ Bifrost models, run-slot keys, judge budget | Baseline agent passes the contract on a practice task | Home + Receipt on fixtures | **Baseline runs 1 task end to end: proxy → Bifrost → record → receipt** |
 | Tue Nov 11 | Pools + traps built; GPT Researcher wrapped; SSE stream | Cheap-first + Evidence-gated; exact/abstention/trap graders | Leaderboard + sliders, Run screen with live grid on fake stream | All 4 agents run; 12 tasks + 4 twins written and verified |
 | Wed Nov 12 | Full benchmark starts overnight; `/api/batches` live | Claim judge done; hand-labeling; judge agreement | Compare + Briefing screens | Live Run button works end to end locally |
 | Thu Nov 13 | Deploy to HF Space; rerun failures | `/api/brief` live with Tavily | Switch all screens to real API | Deployed URL works with real results |
