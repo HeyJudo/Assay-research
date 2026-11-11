@@ -417,3 +417,33 @@ def test_bad_trap_value_refuses_to_start(tmp_path):
         p.wait()
         out.close()
     assert "refusing to start" in (tmp_path / "mitmdump.out").read_text()
+
+
+def test_trap_without_matching_pool_doc_refuses_to_start(tmp_path):
+    pool = tmp_path / "plain.json"
+    pool.write_text(json.dumps({"task_id": "t", "pool_version": "t", "docs": [
+        {"url": "https://x.invalid/a", "title": "a", "content": "python", "published_date": None}]}))
+    p, port, ca, log, out = launch(tmp_path, pool=pool, env={"ASSAY_TRAP": "fake_article"})
+    try:
+        p.wait(timeout=15)
+    finally:
+        p.kill()
+        p.wait()
+        out.close()
+    assert "refusing to start" in (tmp_path / "mitmdump.out").read_text()
+
+
+def test_punctuation_only_query_in_trapped_run(tmp_path):
+    with trapped(tmp_path, "fake_article") as c:
+        r = search(c, query="???")
+        assert r.status_code == 200
+        assert r.json()["results"][0]["url"] == FAKE and r.json()["results"][0]["score"] == 1.0
+
+
+def test_traps_match_models(monkeypatch, tmp_path):
+    from typing import get_args
+    monkeypatch.setenv("ASSAY_POOL_FILE", str(POOL))  # the module builds its add-on on import
+    monkeypatch.setenv("ASSAY_SEARCH_LOG", str(tmp_path / "s.jsonl"))
+    from assay.models import Trap
+    from assay.proxy import TRAPS
+    assert TRAPS == set(get_args(Trap))

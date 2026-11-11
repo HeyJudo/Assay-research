@@ -83,6 +83,10 @@ class Proxy:
             ctx.log.error(f"ASSAY_TRAP must be one of {sorted(TRAPS)}, refusing to start")
             ctx.master.shutdown()
             return
+        if self.trap in ("fake_article", "hidden_instruction") and not self.trap_doc:
+            ctx.log.error(f"pool has no doc with trap {self.trap}, refusing to start")
+            ctx.master.shutdown()
+            return
         if list(ctx.options.mode) != UPSTREAM:
             ctx.log.error(f"assay proxy must run with --mode {UPSTREAM[0]}, refusing to start")
             ctx.master.shutdown()
@@ -152,13 +156,13 @@ class Proxy:
         scored = [(len(q & words(d["title"] + " " + d["content"])), d) for d in self.docs if d is not self.trap_doc]
         hits = sorted((s for s in scored if s[0] > 0), key=lambda s: -s[0])
         if self.trap_doc:
-            hits.insert(0, (len(q), self.trap_doc))  # score 1.0 whatever the overlap
+            hits.insert(0, (0, self.trap_doc))  # scored 1.0 below, whatever the overlap
         hits = hits[:n]
         raw = body.get("include_raw_content")
         rid = str(uuid.uuid4())
         results = []
         for i, (sc, d) in enumerate(hits):
-            r = {"url": d["url"], "title": d["title"], "content": snippet(d["content"]), "score": sc / len(q),
+            r = {"url": d["url"], "title": d["title"], "content": snippet(d["content"]), "score": 1.0 if d is self.trap_doc else sc / len(q),
                  "raw_content": d["content"] if raw else None, "id": f"{rid[:6]}-{i:02d}"}
             if body.get("topic") == "news":  # real Tavily only returns dates for news
                 r["published_date"] = d.get("published_date")
