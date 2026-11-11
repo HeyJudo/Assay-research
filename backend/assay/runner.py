@@ -11,9 +11,14 @@ import time
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import get_args
+from urllib.parse import urlsplit, urlunsplit
 
 from assay import store
-from assay.models import RunConfig, RunMetrics, RunOutput, RunRecord, Step, Task
+from assay.models import RunConfig, RunMetrics, RunOutput, RunRecord, Step, Task, Trap
+
+# Must match PROXY_TRAPS in proxy.py. model_outage is handled by outage.py, not the search proxy.
+PROXY_TRAPS = {"fake_article", "hidden_instruction", "search_outage"}
 
 # Allowlist, not os.environ: the parent holds the real judge and provider keys.
 OS_BASICS = ["PATH", "SYSTEMROOT", "COMSPEC", "PATHEXT", "TEMP", "TMP", "HOME", "USERPROFILE", "LANG", "LC_ALL"]
@@ -34,9 +39,19 @@ def _command(run: Path) -> list[str]:
 def run_once(agent_dir: Path, task: Task, *, agent_version: str, models: list[str], prompt_hash: str,
              openai_base_url=None, openai_api_key=None,
              https_proxy=None, ca_cert=None, timeout_s: float = 600, batch_id: str | None = None,
-             repeat: int = 1, trap=None, trap_seed=None, pool_version="v1") -> RunRecord:
+             repeat: int = 1, trap=None, trap_seed=None, pool_version="v1",
+             llm_outage_url=None) -> RunRecord:
     if not (agent_version and models and prompt_hash) or not all(m.strip() for m in models):
         raise ValueError("agent_version, models and prompt_hash are required")
+    if trap is not None and trap not in get_args(Trap):
+        raise ValueError(f"unknown trap {trap!r}")
+    if trap in PROXY_TRAPS and not https_proxy:
+        raise ValueError(f"{trap} needs https_proxy: the proxy enforces it")
+    if trap == "model_outage" and not (llm_outage_url and openai_base_url):
+        raise ValueError("model_outage needs llm_outage_url and openai_base_url")
+    rid = f"run_{uuid.uuid4().hex[:12]}"
+    if trap == "model_outage":  # the add-on keys its per-run 503 count on /r/<rid>
+        openai_base_url = f"{llm_outage_url.rstrip('/')}/r/{rid}{urlsplit(openai_base_url).path}"
     started = datetime.now(timezone.utc)
     env = {k: os.environ[k] for k in OS_BASICS if k in os.environ}
     # Blank every .env.example name so load_dotenv(override=False) in the agent can't fill real keys from the repo-root .env.
@@ -49,9 +64,18 @@ def run_once(agent_dir: Path, task: Task, *, agent_version: str, models: list[st
         pass
     env.update(ASSAY_TASK=task.prompt, ASSAY_AS_OF=task.as_of_date)
     for k, v in {"OPENAI_BASE_URL": openai_base_url, "OPENAI_API_KEY": openai_api_key,
-                 "HTTPS_PROXY": https_proxy, "SSL_CERT_FILE": ca_cert, "REQUESTS_CA_BUNDLE": ca_cert}.items():
+                 "SSL_CERT_FILE": ca_cert, "REQUESTS_CA_BUNDLE": ca_cert}.items():
         if v:
             env[k] = v
+    if https_proxy:
+        # The proxy tells runs apart by the username and checks the password (the run's proxy trap) against its own.
+        u = urlsplit(https_proxy)
+        tag = trap if trap in PROXY_TRAPS else "none"
+        proxy = urlunsplit(u._replace(netloc=f"{rid}:{tag}@{u.netloc.rpartition('@')[2]}"))
+        # Lowercase too: curl only reads lowercase http_proxy.
+        for k in ("HTTPS_PROXY", "HTTP_PROXY", "https_proxy", "http_proxy"):
+            env[k] = proxy
+        env["NO_PROXY"] = env["no_proxy"] = "localhost,127.0.0.1"
 
     text, error = "", None
     t0 = time.monotonic()
@@ -98,7 +122,7 @@ def run_once(agent_dir: Path, task: Task, *, agent_version: str, models: list[st
     steps = [Step(i=1, t=duration, kind="error", detail=error, model=None, phase="write",
                   tokens=0, cost_usd=0)] if error else []
     return RunRecord(
-        id=f"run_{uuid.uuid4().hex[:12]}", batch_id=batch_id or f"b_{uuid.uuid4().hex[:12]}",
+        id=rid, batch_id=batch_id or f"b_{uuid.uuid4().hex[:12]}",
         agent_id=agent_dir.name, task_id=task.id, task_type=task.type, trap=trap, repeat=repeat,
         status="error" if error else "done",
         started_at=started.strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z", duration_s=duration,
@@ -125,10 +149,13 @@ if __name__ == "__main__":
     ap.add_argument("--https-proxy")
     ap.add_argument("--ca-cert")
     ap.add_argument("--timeout", type=float, default=600)
+    ap.add_argument("--trap", choices=get_args(Trap))
+    ap.add_argument("--llm-outage-url")
     a = ap.parse_args()
     rec = run_once(a.agent.resolve(), Task.model_validate_json(a.task.read_text(encoding="utf-8")),
                    agent_version=a.agent_version, models=[m.strip() for m in a.models.split(",") if m.strip()], prompt_hash=a.prompt_hash,
                    openai_base_url=a.openai_base_url, openai_api_key=os.environ.get("ASSAY_AGENT_API_KEY"),
-                   https_proxy=a.https_proxy, ca_cert=a.ca_cert, timeout_s=a.timeout)
+                   https_proxy=a.https_proxy, ca_cert=a.ca_cert, timeout_s=a.timeout,
+                   trap=a.trap, llm_outage_url=a.llm_outage_url)
     store.save(rec)
     print(rec.id)

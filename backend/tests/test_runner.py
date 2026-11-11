@@ -6,6 +6,7 @@ import sys
 from pathlib import Path
 
 import pytest
+from test_proxy import launch, wait_up
 
 from assay import runner, store
 from assay.models import RunRecord, Task
@@ -60,7 +61,11 @@ def test_env_routing_and_allowlist(tmp_path, monkeypatch):
     env = json.loads(rec.output.text)
     assert env["OPENAI_BASE_URL"] == "http://b/v1"
     assert env["OPENAI_API_KEY"] == "k"
-    assert env["HTTPS_PROXY"] == "http://p:1"
+    proxy = f"http://{rec.id}:none@p:1"
+    assert env["HTTPS_PROXY"] == env["HTTP_PROXY"] == proxy
+    assert env["NO_PROXY"] == "localhost,127.0.0.1"
+    if os.name != "nt":  # Windows env names are case-insensitive, so the lowercase twins are invisible there
+        assert env["https_proxy"] == env["http_proxy"] == proxy and env["no_proxy"] == "localhost,127.0.0.1"
     assert env["SSL_CERT_FILE"] == "/ca.pem"
     assert env["REQUESTS_CA_BUNDLE"] == "/ca.pem"
     assert env["TAVILY_API_KEY"] == ""
@@ -214,3 +219,85 @@ def test_cli_drops_empty_models(tmp_path, monkeypatch):
          "--agent-version", "0.1", "--models", "a,,b", "--prompt-hash", "h"],
         cwd=BACKEND, env={**os.environ, "ASSAY_DB": str(db)}, capture_output=True, text=True, check=True)
     assert store.get(out.stdout.strip()).config.models == ["a", "b"]
+
+
+def test_runner_through_real_proxy(tmp_path):
+    p, port, ca, log, out = launch(tmp_path)
+    try:
+        wait_up(p, port, ca, tmp_path)
+        ops = [{"op": "search", "arg": "free threaded build"}, {"op": "fetch", "arg": "http://not-in-pool.invalid/x"}]
+        task = TASK.model_copy(update={"prompt": json.dumps(ops)})
+        rec = runner.run_once(BACKEND / "tests" / "agents" / "searcher", task, **CFG,
+                              https_proxy=f"http://127.0.0.1:{port}", ca_cert=str(ca))
+        assert rec.status == "done", rec.steps
+        assert json.loads(rec.output.text) == [200, 404]
+        lines = [json.loads(x) for x in log.read_text().splitlines()]
+        assert [x["kind"] for x in lines] == ["search", "fetch"]
+        assert {x["run_id"] for x in lines} == {rec.id}
+    finally:
+        p.kill()
+        p.wait()
+        out.close()
+
+
+def test_model_outage_routes_through_outage_proxy(tmp_path):
+    import test_outage as to
+    srv, hits = to.sentinel()
+    p, port = to.launch(tmp_path, f"reverse:http://127.0.0.1:{srv.server_port}")
+    try:
+        to.wait_up(p, port)
+        task = TASK.model_copy(update={"prompt": json.dumps([{"op": "llm", "arg": "hi"}] * 4)})
+        rec = runner.run_once(BACKEND / "tests" / "agents" / "searcher", task, **CFG, trap="model_outage",
+                              openai_base_url=f"http://127.0.0.1:{srv.server_port}/v1", openai_api_key="k",
+                              llm_outage_url=f"http://127.0.0.1:{port}")
+        assert rec.status == "done", rec.steps
+        assert json.loads(rec.output.text) == [503, 503, 503, 200]
+        assert hits == ["/v1/chat/completions"]
+        assert rec.trap == "model_outage"
+    finally:
+        p.kill()
+        p.wait()
+        srv.shutdown()
+
+
+def test_model_outage_requires_url():
+    with pytest.raises(ValueError):
+        runner.run_once(STUB, TASK, **CFG, trap="model_outage", openai_base_url="http://b/v1")
+    with pytest.raises(ValueError):
+        runner.run_once(STUB, TASK, **CFG, trap="model_outage", llm_outage_url="http://o:1")
+
+
+def test_other_traps_keep_base_url(tmp_path):
+    agent = make_agent(tmp_path, "open(os.environ['ASSAY_OUTPUT'],'w').write(os.environ['OPENAI_BASE_URL'])\n")
+    rec = runner.run_once(agent, TASK, **CFG, trap="search_outage", openai_base_url="http://b/v1",
+                          llm_outage_url="http://o:1", https_proxy="http://p:1")
+    assert rec.output.text == "http://b/v1"
+
+
+DUMP_ENV = "open(os.environ['ASSAY_OUTPUT'],'w').write(json.dumps(dict(os.environ)))\n"
+
+
+def test_model_outage_tag_is_none(tmp_path):
+    agent = make_agent(tmp_path, DUMP_ENV)
+    rec = runner.run_once(agent, TASK, **CFG, trap="model_outage", https_proxy="http://p:1",
+                          openai_base_url="http://b/v1", llm_outage_url="http://o:2")
+    assert json.loads(rec.output.text)["HTTPS_PROXY"] == f"http://{rec.id}:none@p:1"
+
+
+def test_proxy_trap_tag_is_the_trap(tmp_path):
+    agent = make_agent(tmp_path, DUMP_ENV)
+    rec = runner.run_once(agent, TASK, **CFG, trap="search_outage", https_proxy="http://p:1")
+    assert json.loads(rec.output.text)["HTTPS_PROXY"] == f"http://{rec.id}:search_outage@p:1"
+
+
+def test_proxy_trap_requires_proxy():
+    with pytest.raises(ValueError):
+        runner.run_once(STUB, TASK, **CFG, trap="search_outage")
+
+
+def test_bad_trap_rejected_early(tmp_path):
+    marker = tmp_path / "ran"
+    agent = make_agent(tmp_path, f"open({str(marker)!r},'w').write('x')\n")
+    with pytest.raises(ValueError):
+        runner.run_once(agent, TASK, **CFG, trap="nope", https_proxy="http://p:1")
+    assert not marker.exists()
