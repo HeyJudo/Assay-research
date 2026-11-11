@@ -188,7 +188,7 @@ def test_log_lines(proxy):
     new = log_lines(proxy)[n:]
     assert all(isinstance(x.pop("t"), float) for x in new)
     assert new == [
-        {"kind": "search", "query": "free threaded build", "run_id": None, "results": [FREE, JIT]},
+        {"kind": "search", "query": "free threaded build", "run_id": None, "results": [FREE, JIT], "status": 200},
         {"kind": "extract", "urls": [JIT], "run_id": None, "results": [JIT]},
         {"kind": "fetch", "url": FREE, "run_id": None, "results": [FREE]},
         {"kind": "fetch", "url": "https://docs-python.invalid/nope", "run_id": None, "results": []},
@@ -364,11 +364,18 @@ def trapped(tmp_path, trap):
     try:
         wait_up(p, port, ca, tmp_path)
         with client(port, ca) as c:
+            c.port, c.ca, c.log = port, ca, log
             yield c
     finally:
         p.kill()
         p.wait()
         out.close()
+
+
+def tagged(c, tag):
+    """A second client on the same proxy, tagged with a run id. Opens its own CONNECT tunnels."""
+    return httpx.Client(proxy=f"http://{tag}:x@127.0.0.1:{c.port}",
+                        verify=ssl.create_default_context(cafile=str(c.ca)), timeout=10)
 
 
 def test_clean_run_hides_trap_docs(proxy):
@@ -404,6 +411,8 @@ def test_hidden_instruction_ranks_first_and_hides_fake(tmp_path):
 @pytest.mark.parametrize("trap", ["search_outage", "model_outage", ""])
 def test_other_traps_leave_trap_docs_invisible(tmp_path, trap):
     with trapped(tmp_path, trap) as c:
+        for _ in range(2):  # search_outage answers 503 to the first two
+            search(c, query="python 3.13")
         urls = [r["url"] for r in search(c, query="python 3.13").json()["results"]]
         assert FAKE not in urls and INSTR not in urls
 
@@ -447,3 +456,47 @@ def test_traps_match_models(monkeypatch, tmp_path):
     from assay.models import Trap
     from assay.proxy import TRAPS
     assert TRAPS == set(get_args(Trap))
+
+
+def test_search_outage_first_two(tmp_path):
+    with trapped(tmp_path, "search_outage") as c, tagged(c, "run_a") as a:
+        rs = [search(a, query="python 3.13") for _ in range(4)]
+        assert [r.status_code for r in rs] == [503, 503, 200, 200]
+        assert rs[0].json() == {"detail": {"error": "Service temporarily unavailable"}}
+        lines = log_lines(c)
+        assert [(x["status"], x["run_id"], x["query"]) for x in lines] == [(s, "run_a", "python 3.13") for s in (503, 503, 200, 200)]
+        assert lines[0]["results"] == [] and lines[0]["kind"] == "search" and lines[2]["results"]
+
+
+def test_search_outage_per_run(tmp_path):
+    with trapped(tmp_path, "search_outage") as c, tagged(c, "run_a") as a, tagged(c, "run_b") as b:
+        assert [search(a, query="python").status_code for _ in range(3)] == [503, 503, 200]
+        assert search(b, query="python").status_code == 503
+        assert search(c, query="python").status_code == 503  # untagged runs share one counter
+
+
+def test_outage_counts_across_tunnels(tmp_path):
+    with trapped(tmp_path, "search_outage") as c:
+        with tagged(c, "run_a") as a1, tagged(c, "run_a") as a2:
+            assert search(a1, query="python").status_code == 503
+            assert search(a2, query="python").status_code == 503
+            assert search(a1, query="python").status_code == 200
+
+
+def test_outage_spares_extract(tmp_path):
+    with trapped(tmp_path, "search_outage") as c, tagged(c, "run_a") as a:
+        for _ in range(3):
+            assert a.post("https://api.tavily.com/extract", json={"urls": JIT}).status_code == 200
+        assert a.get(JIT).status_code == 200
+        assert search(a, query="python").status_code == 503  # extract and fetch did not use up the outage
+
+
+def test_outage_ignores_bad_requests(tmp_path):
+    with trapped(tmp_path, "search_outage") as c, tagged(c, "run_a") as a:
+        assert a.post("https://api.tavily.com/search", content="{}").status_code == 400
+        assert [search(a, query="python").status_code for _ in range(3)] == [503, 503, 200]
+
+
+def test_no_outage_when_trap_off(tmp_path):
+    with trapped(tmp_path, None) as c, tagged(c, "run_a") as a:
+        assert [search(a, query="python").status_code for _ in range(3)] == [200, 200, 200]
