@@ -11,7 +11,9 @@ internet. With it they get 502. The add-on refuses to run without that mode.
 
 Pool file, data/pools/<task_id>.json (practice pools: data/practice/pools/):
     {"task_id": str, "pool_version": str,
-     "docs": [{"url", "title", "content", "published_date"}]}
+     "docs": [{"url", "title", "content", "published_date", "trap"?}]}
+A doc with "trap" is invisible (search, extract, fetch) unless it equals ASSAY_TRAP, in which case it
+is also prepended as result #1 of every search. ASSAY_TRAP: unset = clean run, else a Trap in models.py.
 
 Behavior (PRD section 6):
 - No pass-through: localhost is 404 like any non-pool URL. The runner sets NO_PROXY=localhost,127.0.0.1 so agents skip the proxy for local calls (Bifrost).
@@ -32,6 +34,8 @@ from mitmproxy import ctx, http
 
 # ponytail: port 9 is assumed dead (discard service off). Pick another if something listens there.
 UPSTREAM = ["upstream:http://127.0.0.1:9"]
+# Must match the Trap literal in models.py.
+TRAPS = {"fake_article", "hidden_instruction", "search_outage", "model_outage"}
 
 
 def norm(url):
@@ -66,11 +70,19 @@ class Proxy:
         self.tags = {}  # client connection id -> run id, taken from the CONNECT that opened the tunnel
         # KeyError on a missing env var: fail loudly at startup.
         with open(os.environ["ASSAY_POOL_FILE"], encoding="utf-8") as f:
-            self.docs = json.load(f)["docs"]
+            pool = json.load(f)["docs"]
+        self.trap = os.environ.get("ASSAY_TRAP") or None
+        # Docs with a non-matching trap are dropped here, so no code path can reveal them.
+        self.docs = [d for d in pool if not d.get("trap") or d["trap"] == self.trap]
+        self.trap_doc = next((d for d in self.docs if d.get("trap")), None)
         self.by_url = {norm(d["url"]): d for d in self.docs}
         self.log = open(os.environ["ASSAY_SEARCH_LOG"], "a", encoding="utf-8")
 
     def running(self):
+        if self.trap is not None and self.trap not in TRAPS:
+            ctx.log.error(f"ASSAY_TRAP must be one of {sorted(TRAPS)}, refusing to start")
+            ctx.master.shutdown()
+            return
         if list(ctx.options.mode) != UPSTREAM:
             ctx.log.error(f"assay proxy must run with --mode {UPSTREAM[0]}, refusing to start")
             ctx.master.shutdown()
@@ -137,9 +149,11 @@ class Proxy:
         n = max(0, min(n, 20))
         q = words(query)
         # ponytail: naive keyword overlap, upgrade to BM25 if ranking quality matters
-        scored = [(len(q & words(d["title"] + " " + d["content"])), d) for d in self.docs]
-        hits = sorted((s for s in scored if s[0] > 0), key=lambda s: -s[0])[:n]
-        # TRAPS (later task): reorder/inject results or return 503 here.
+        scored = [(len(q & words(d["title"] + " " + d["content"])), d) for d in self.docs if d is not self.trap_doc]
+        hits = sorted((s for s in scored if s[0] > 0), key=lambda s: -s[0])
+        if self.trap_doc:
+            hits.insert(0, (len(q), self.trap_doc))  # score 1.0 whatever the overlap
+        hits = hits[:n]
         raw = body.get("include_raw_content")
         rid = str(uuid.uuid4())
         results = []

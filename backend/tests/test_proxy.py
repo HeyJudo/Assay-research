@@ -1,3 +1,4 @@
+import contextlib
 import json
 import os
 import socket
@@ -29,10 +30,10 @@ def free_port():
         return s.getsockname()[1]
 
 
-def launch(tmp, script=ROOT / "backend" / "assay" / "proxy.py", mode=True, pool=POOL):
+def launch(tmp, script=ROOT / "backend" / "assay" / "proxy.py", mode=True, pool=POOL, env=None):
     """Start a real mitmdump. Returns (process, port, ca path, search log, output file)."""
     port, log, out = free_port(), tmp / "search.jsonl", open(tmp / "mitmdump.out", "w")
-    env = {**os.environ, "ASSAY_POOL_FILE": str(pool), "ASSAY_SEARCH_LOG": str(log)}
+    env = {**os.environ, "ASSAY_POOL_FILE": str(pool), "ASSAY_SEARCH_LOG": str(log), **(env or {})}
     cmd = [sys.executable, "-c", "from mitmproxy.tools.main import mitmdump; mitmdump()",
            "-s", str(script), "--listen-host", "127.0.0.1", "--listen-port", str(port),
            "--set", f"confdir={tmp}", "--set", "connection_strategy=lazy", "--set", "rawtcp=false"]
@@ -351,3 +352,68 @@ def test_raw_tcp_over_connect_is_not_relayed(proxy):
     t.join()
     srv.close()
     assert got in ([], [b""])
+
+
+FAKE = "https://trap-fake.invalid/python-313-gil-removed"
+INSTR = "https://trap-instr.invalid/python-313-notes"
+
+
+@contextlib.contextmanager
+def trapped(tmp_path, trap):
+    p, port, ca, log, out = launch(tmp_path, env={"ASSAY_TRAP": trap} if trap is not None else None)
+    try:
+        wait_up(p, port, ca, tmp_path)
+        with client(port, ca) as c:
+            yield c
+    finally:
+        p.kill()
+        p.wait()
+        out.close()
+
+
+def test_clean_run_hides_trap_docs(proxy):
+    for q in ("python 3.13", "global interpreter lock removed", "migration notes phrase"):
+        urls = [r["url"] for r in search(proxy, query=q, max_results=20).json()["results"]]
+        assert FAKE not in urls and INSTR not in urls
+    r = proxy.post("https://api.tavily.com/extract", json={"urls": [FAKE, INSTR]}).json()
+    assert r["results"] == [] and [f["url"] for f in r["failed_results"]] == [FAKE, INSTR]
+    assert proxy.get(FAKE).status_code == 404 and proxy.get(INSTR).status_code == 404
+
+
+def test_fake_article_ranks_first(tmp_path):
+    with trapped(tmp_path, "fake_article") as c:
+        res = search(c, query="python 3.13 free threading").json()["results"]
+        urls = [r["url"] for r in res]
+        assert urls[0] == FAKE and res[0]["score"] == 1.0
+        assert "https://docs-python.invalid/3.13/free-threading" in urls and urls.count(FAKE) == 1
+        assert INSTR not in urls
+        assert search(c, query="zzzz qqqq").json()["results"][0]["url"] == FAKE  # no word overlap
+        assert [r["url"] for r in search(c, query="python", max_results=1).json()["results"]] == [FAKE]
+        assert c.get(FAKE).status_code == 200 and c.get(INSTR).status_code == 404
+        r = c.post("https://api.tavily.com/extract", json={"urls": [FAKE, INSTR]}).json()
+        assert [x["url"] for x in r["results"]] == [FAKE] and [f["url"] for f in r["failed_results"]] == [INSTR]
+
+
+def test_hidden_instruction_ranks_first_and_hides_fake(tmp_path):
+    with trapped(tmp_path, "hidden_instruction") as c:
+        urls = [r["url"] for r in search(c, query="python 3.13 jit").json()["results"]]
+        assert urls[0] == INSTR and FAKE not in urls
+        assert c.get(INSTR).status_code == 200 and c.get(FAKE).status_code == 404
+
+
+@pytest.mark.parametrize("trap", ["search_outage", "model_outage", ""])
+def test_other_traps_leave_trap_docs_invisible(tmp_path, trap):
+    with trapped(tmp_path, trap) as c:
+        urls = [r["url"] for r in search(c, query="python 3.13").json()["results"]]
+        assert FAKE not in urls and INSTR not in urls
+
+
+def test_bad_trap_value_refuses_to_start(tmp_path):
+    p, port, ca, log, out = launch(tmp_path, env={"ASSAY_TRAP": "fake-article"})
+    try:
+        p.wait(timeout=15)
+    finally:
+        p.kill()
+        p.wait()
+        out.close()
+    assert "refusing to start" in (tmp_path / "mitmdump.out").read_text()
