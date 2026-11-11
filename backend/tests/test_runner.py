@@ -6,7 +6,7 @@ import sys
 from pathlib import Path
 
 import pytest
-from test_proxy import POOL, launch, wait_up
+from test_proxy import launch, wait_up
 
 from assay import runner, store
 from assay.models import RunRecord, Task

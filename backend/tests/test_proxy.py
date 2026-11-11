@@ -207,6 +207,14 @@ def test_log_lines_carry_run_tag(proxy):
     assert [x["run_id"] for x in new] == ["run_t1", "run_t1", "run_t1", None]
 
 
+@pytest.mark.parametrize("auth", ["Basic !!!", "Bearer abc", "Basic"])
+def test_malformed_proxy_auth_is_untagged(proxy, auth):
+    n = len(log_lines(proxy))
+    r = proxy.get("http://not-in-pool.invalid/x", headers={"Proxy-Authorization": auth})
+    assert r.status_code == 404
+    assert [x["run_id"] for x in log_lines(proxy)[n:]] == [None]
+
+
 def test_localhost_is_not_passed_through(proxy):
     srv, hits = sentinel()
     n = len(log_lines(proxy))

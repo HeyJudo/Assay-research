@@ -86,7 +86,7 @@ class Proxy:
         auth = flow.request.headers.get("Proxy-Authorization", "")
         if auth.lower().startswith("basic "):
             try:
-                return base64.b64decode(auth[6:]).decode().split(":", 1)[0]
+                return base64.b64decode(auth[6:], validate=True).decode().split(":", 1)[0] or None
             except ValueError:
                 return None
         return self.tags.get(flow.client_conn.id)

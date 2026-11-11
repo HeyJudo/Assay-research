@@ -57,7 +57,7 @@ def run_once(agent_dir: Path, task: Task, *, agent_version: str, models: list[st
     if https_proxy:
         # The proxy tells runs apart by this userinfo (password is a dummy so clients send Basic auth).
         u = urlsplit(https_proxy)
-        env["HTTPS_PROXY"] = env["HTTP_PROXY"] = urlunsplit(u._replace(netloc=f"{rid}:x@{u.hostname}" + (f":{u.port}" if u.port else "")))
+        env["HTTPS_PROXY"] = env["HTTP_PROXY"] = urlunsplit(u._replace(netloc=f"{rid}:x@{u.netloc.rpartition('@')[2]}"))
         env["NO_PROXY"] = "localhost,127.0.0.1"
 
     text, error = "", None
