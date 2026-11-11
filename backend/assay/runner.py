@@ -71,8 +71,11 @@ def run_once(agent_dir: Path, task: Task, *, agent_version: str, models: list[st
         # The proxy tells runs apart by the username and checks the password (the run's proxy trap) against its own.
         u = urlsplit(https_proxy)
         tag = trap if trap in PROXY_TRAPS else "none"
-        env["HTTPS_PROXY"] = env["HTTP_PROXY"] = urlunsplit(u._replace(netloc=f"{rid}:{tag}@{u.netloc.rpartition('@')[2]}"))
-        env["NO_PROXY"] = "localhost,127.0.0.1"
+        proxy = urlunsplit(u._replace(netloc=f"{rid}:{tag}@{u.netloc.rpartition('@')[2]}"))
+        # Lowercase too: curl only reads lowercase http_proxy.
+        for k in ("HTTPS_PROXY", "HTTP_PROXY", "https_proxy", "http_proxy"):
+            env[k] = proxy
+        env["NO_PROXY"] = env["no_proxy"] = "localhost,127.0.0.1"
 
     text, error = "", None
     t0 = time.monotonic()
