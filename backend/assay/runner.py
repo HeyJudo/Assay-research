@@ -17,6 +17,9 @@ from urllib.parse import urlsplit, urlunsplit
 from assay import store
 from assay.models import RunConfig, RunMetrics, RunOutput, RunRecord, Step, Task, Trap
 
+# Must match PROXY_TRAPS in proxy.py. model_outage is handled by outage.py, not the search proxy.
+PROXY_TRAPS = {"fake_article", "hidden_instruction", "search_outage"}
+
 # Allowlist, not os.environ: the parent holds the real judge and provider keys.
 OS_BASICS = ["PATH", "SYSTEMROOT", "COMSPEC", "PATHEXT", "TEMP", "TMP", "HOME", "USERPROFILE", "LANG", "LC_ALL"]
 
@@ -40,6 +43,10 @@ def run_once(agent_dir: Path, task: Task, *, agent_version: str, models: list[st
              llm_outage_url=None) -> RunRecord:
     if not (agent_version and models and prompt_hash) or not all(m.strip() for m in models):
         raise ValueError("agent_version, models and prompt_hash are required")
+    if trap is not None and trap not in get_args(Trap):
+        raise ValueError(f"unknown trap {trap!r}")
+    if trap in PROXY_TRAPS and not https_proxy:
+        raise ValueError(f"{trap} needs https_proxy: the proxy enforces it")
     if trap == "model_outage" and not (llm_outage_url and openai_base_url):
         raise ValueError("model_outage needs llm_outage_url and openai_base_url")
     rid = f"run_{uuid.uuid4().hex[:12]}"
@@ -61,9 +68,10 @@ def run_once(agent_dir: Path, task: Task, *, agent_version: str, models: list[st
         if v:
             env[k] = v
     if https_proxy:
-        # The proxy tells runs apart by this userinfo (password is a dummy so clients send Basic auth).
+        # The proxy tells runs apart by the username and checks the password (the run's proxy trap) against its own.
         u = urlsplit(https_proxy)
-        env["HTTPS_PROXY"] = env["HTTP_PROXY"] = urlunsplit(u._replace(netloc=f"{rid}:x@{u.netloc.rpartition('@')[2]}"))
+        tag = trap if trap in PROXY_TRAPS else "none"
+        env["HTTPS_PROXY"] = env["HTTP_PROXY"] = urlunsplit(u._replace(netloc=f"{rid}:{tag}@{u.netloc.rpartition('@')[2]}"))
         env["NO_PROXY"] = "localhost,127.0.0.1"
 
     text, error = "", None

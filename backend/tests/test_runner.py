@@ -61,7 +61,8 @@ def test_env_routing_and_allowlist(tmp_path, monkeypatch):
     env = json.loads(rec.output.text)
     assert env["OPENAI_BASE_URL"] == "http://b/v1"
     assert env["OPENAI_API_KEY"] == "k"
-    assert env["HTTPS_PROXY"] == env["HTTP_PROXY"] == f"http://{rec.id}:x@p:1"
+    proxy = f"http://{rec.id}:none@p:1"
+    assert env["HTTPS_PROXY"] == env["HTTP_PROXY"] == proxy
     assert env["NO_PROXY"] == "localhost,127.0.0.1"
     assert env["SSL_CERT_FILE"] == "/ca.pem"
     assert env["REQUESTS_CA_BUNDLE"] == "/ca.pem"
@@ -267,5 +268,34 @@ def test_model_outage_requires_url():
 def test_other_traps_keep_base_url(tmp_path):
     agent = make_agent(tmp_path, "open(os.environ['ASSAY_OUTPUT'],'w').write(os.environ['OPENAI_BASE_URL'])\n")
     rec = runner.run_once(agent, TASK, **CFG, trap="search_outage", openai_base_url="http://b/v1",
-                          llm_outage_url="http://o:1")
+                          llm_outage_url="http://o:1", https_proxy="http://p:1")
     assert rec.output.text == "http://b/v1"
+
+
+DUMP_ENV = "open(os.environ['ASSAY_OUTPUT'],'w').write(json.dumps(dict(os.environ)))\n"
+
+
+def test_model_outage_tag_is_none(tmp_path):
+    agent = make_agent(tmp_path, DUMP_ENV)
+    rec = runner.run_once(agent, TASK, **CFG, trap="model_outage", https_proxy="http://p:1",
+                          openai_base_url="http://b/v1", llm_outage_url="http://o:2")
+    assert json.loads(rec.output.text)["HTTPS_PROXY"] == f"http://{rec.id}:none@p:1"
+
+
+def test_proxy_trap_tag_is_the_trap(tmp_path):
+    agent = make_agent(tmp_path, DUMP_ENV)
+    rec = runner.run_once(agent, TASK, **CFG, trap="search_outage", https_proxy="http://p:1")
+    assert json.loads(rec.output.text)["HTTPS_PROXY"] == f"http://{rec.id}:search_outage@p:1"
+
+
+def test_proxy_trap_requires_proxy():
+    with pytest.raises(ValueError):
+        runner.run_once(STUB, TASK, **CFG, trap="search_outage")
+
+
+def test_bad_trap_rejected_early(tmp_path):
+    marker = tmp_path / "ran"
+    agent = make_agent(tmp_path, f"open({str(marker)!r},'w').write('x')\n")
+    with pytest.raises(ValueError):
+        runner.run_once(agent, TASK, **CFG, trap="nope", https_proxy="http://p:1")
+    assert not marker.exists()

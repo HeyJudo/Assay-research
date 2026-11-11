@@ -198,7 +198,7 @@ def test_log_lines(proxy):
 def test_log_lines_carry_run_tag(proxy):
     n = len(log_lines(proxy))
     ca = proxy.log.parent / "mitmproxy-ca-cert.pem"
-    with httpx.Client(proxy=f"http://run_t1:x@127.0.0.1:{proxy.port}",
+    with httpx.Client(proxy=f"http://run_t1:none@127.0.0.1:{proxy.port}",
                       verify=ssl.create_default_context(cafile=str(ca)), timeout=10) as c:
         search(c, query="free threaded build")
         c.get(FREE)
@@ -364,7 +364,7 @@ def trapped(tmp_path, trap):
     try:
         wait_up(p, port, ca, tmp_path)
         with client(port, ca) as c:
-            c.port, c.ca, c.log = port, ca, log
+            c.port, c.ca, c.log, c.trap = port, ca, log, trap
             yield c
     finally:
         p.kill()
@@ -372,9 +372,11 @@ def trapped(tmp_path, trap):
         out.close()
 
 
-def tagged(c, tag):
-    """A second client on the same proxy, tagged with a run id. Opens its own CONNECT tunnels."""
-    return httpx.Client(proxy=f"http://{tag}:x@127.0.0.1:{c.port}",
+def tagged(c, tag, trap="proxy's"):
+    """A second client on the same proxy, tagged with a run id and the trap it expects (default: the proxy's own)."""
+    if trap == "proxy's":
+        trap = c.trap if c.trap in ("fake_article", "hidden_instruction", "search_outage") else None
+    return httpx.Client(proxy=f"http://{tag}:{trap or 'none'}@127.0.0.1:{c.port}",
                         verify=ssl.create_default_context(cafile=str(c.ca)), timeout=10)
 
 
@@ -500,3 +502,23 @@ def test_outage_ignores_bad_requests(tmp_path):
 def test_no_outage_when_trap_off(tmp_path):
     with trapped(tmp_path, None) as c, tagged(c, "run_a") as a:
         assert [search(a, query="python").status_code for _ in range(3)] == [200, 200, 200]
+
+
+def test_trap_mismatch_rejected(tmp_path):
+    with trapped(tmp_path, "fake_article") as c, tagged(c, "run_m", None) as m:
+        for r in (search(m, query="python"), m.get(JIT)):
+            assert r.status_code == 502
+            assert r.json() == {"detail": {"error": "trap mismatch: run expects none, proxy runs fake_article"}}
+        lines = log_lines(c)
+        assert [(x["kind"], x["run_id"]) for x in lines] == [("trap_mismatch", "run_m")] * 2
+
+
+def test_trap_match_served(tmp_path):
+    with trapped(tmp_path, "fake_article") as c, tagged(c, "run_m", "fake_article") as m:
+        assert search(m, query="python").status_code == 200
+        assert m.get(JIT).status_code == 200
+
+
+def test_clean_tag_on_clean_proxy(tmp_path):
+    with trapped(tmp_path, None) as c, tagged(c, "run_c", None) as m:
+        assert search(m, query="python").status_code == 200

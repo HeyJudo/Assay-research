@@ -36,6 +36,8 @@ from mitmproxy import ctx, http
 UPSTREAM = ["upstream:http://127.0.0.1:9"]
 # Must match the Trap literal in models.py.
 TRAPS = {"fake_article", "hidden_instruction", "search_outage", "model_outage"}
+# Traps this proxy implements. Must match PROXY_TRAPS in runner.py.
+PROXY_TRAPS = TRAPS - {"model_outage"}
 
 
 def norm(url):
@@ -67,11 +69,12 @@ def parse(flow):
 
 class Proxy:
     def __init__(self):
-        self.tags = {}  # client connection id -> run id, taken from the CONNECT that opened the tunnel
+        self.tags = {}  # client connection id -> (run id, trap the run expects), taken from the CONNECT that opened the tunnel
         # KeyError on a missing env var: fail loudly at startup.
         with open(os.environ["ASSAY_POOL_FILE"], encoding="utf-8") as f:
             pool = json.load(f)["docs"]
         self.trap = os.environ.get("ASSAY_TRAP") or None
+        self.expected = self.trap if self.trap in PROXY_TRAPS else "none"
         # Docs with a non-matching trap are dropped here, so no code path can reveal them.
         self.docs = [d for d in pool if not d.get("trap") or d["trap"] == self.trap]
         self.trap_doc = next((d for d in self.docs if d.get("trap")), None)
@@ -98,20 +101,24 @@ class Proxy:
         # (tcp_start cannot stop it). With rawtcp off they hit the HTTP parser and fail.
         ctx.options.rawtcp = False
 
-    def run_id(self, flow):
-        """Username of Basic Proxy-Authorization: on the request itself, else on its tunnel's CONNECT."""
+    def tag(self, flow):
+        """(username, password) of Basic Proxy-Authorization: on the request itself, else on its tunnel's CONNECT."""
         auth = flow.request.headers.get("Proxy-Authorization", "")
         if auth.lower().startswith("basic "):
             try:
-                return base64.b64decode(auth[6:], validate=True).decode().split(":", 1)[0] or None
+                user, _, pw = base64.b64decode(auth[6:], validate=True).decode().partition(":")
             except ValueError:
-                return None
-        return self.tags.get(flow.client_conn.id)
+                return None, None
+            return (user, pw) if user else (None, None)
+        return self.tags.get(flow.client_conn.id, (None, None))
+
+    def run_id(self, flow):
+        return self.tag(flow)[0]
 
     def http_connect(self, flow: http.HTTPFlow):
-        rid = self.run_id(flow)
+        rid, pw = self.tag(flow)
         if rid:
-            self.tags[flow.client_conn.id] = rid
+            self.tags[flow.client_conn.id] = (rid, pw)
 
     def write(self, flow, kind, results, **key):
         self.log.write(json.dumps({"t": time.time(), "kind": kind, **key, "run_id": self.run_id(flow),
@@ -130,6 +137,13 @@ class Proxy:
             flow.response = http.Response.make(500, b"assay proxy error")
 
     def route(self, flow):
+        rid, pw = self.tag(flow)
+        if rid and pw != self.expected:  # untagged requests are not checked
+            self.write(flow, "trap_mismatch", [], expects=pw, runs=self.expected)
+            flow.response = http.Response.make(
+                502, json.dumps({"detail": {"error": f"trap mismatch: run expects {pw}, proxy runs {self.expected}"}}),
+                {"Content-Type": "application/json"})
+            return
         req = flow.request
         host = req.host.lower()  # URL host, not the spoofable Host header
         path = req.path.split("?")[0]
