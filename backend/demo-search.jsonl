@@ -1,3 +1,0 @@
-{"t": 1794288025.3876154, "kind": "fetch", "url": "http://127.0.0.1:8081/", "results": []}
-{"t": 1794288035.894226, "kind": "search", "query": "python 3.13 release", "results": ["https://news-python.invalid/313-release", "https://docs-python.invalid/3.13/free-threading", "https://docs-python.invalid/3.13/jit"]}
-{"t": 1794288035.9477851, "kind": "fetch", "url": "https://www.python.org/", "results": []}
