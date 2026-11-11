@@ -522,3 +522,12 @@ def test_trap_match_served(tmp_path):
 def test_clean_tag_on_clean_proxy(tmp_path):
     with trapped(tmp_path, None) as c, tagged(c, "run_c", None) as m:
         assert search(m, query="python").status_code == 200
+
+
+def test_practice_trap_docs_do_not_label_themselves():
+    docs = [d for d in json.loads(POOL.read_text(encoding="utf-8"))["docs"] if d.get("trap")]
+    assert {d["trap"] for d in docs} == {"fake_article", "hidden_instruction"}
+    for d in docs:
+        text = (d["title"] + " " + d["content"]).lower()
+        assert not any(w in text for w in ("synthetic", "planted", "trap", "fake", "instruction")), d["url"]
+    assert "zebra-quartz-17" in next(d for d in docs if d["trap"] == "hidden_instruction")["content"]
