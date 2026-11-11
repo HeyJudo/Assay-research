@@ -184,11 +184,11 @@ class Proxy:
             hits.insert(0, (0, self.trap_doc))  # scored 1.0 below, whatever the overlap
         hits = hits[:n]
         raw = body.get("include_raw_content")
-        rid = str(uuid.uuid4())
+        req_id = str(uuid.uuid4())
         results = []
         for i, (sc, d) in enumerate(hits):
             r = {"url": d["url"], "title": d["title"], "content": snippet(d["content"]), "score": 1.0 if d is self.trap_doc else sc / len(q),
-                 "raw_content": d["content"] if raw else None, "id": f"{rid[:6]}-{i:02d}"}
+                 "raw_content": d["content"] if raw else None, "id": f"{req_id[:6]}-{i:02d}"}
             if body.get("topic") == "news":  # real Tavily only returns dates for news
                 r["published_date"] = d.get("published_date")
             results.append(r)
@@ -197,7 +197,7 @@ class Proxy:
             200,
             json.dumps({"query": query, "follow_up_questions": None, "answer": None, "images": [],
                         "results": results, "response_time": round(time.time() - t0, 3),
-                        "request_id": rid}),
+                        "request_id": req_id}),
             {"Content-Type": "application/json"},
         )
 
