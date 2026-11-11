@@ -15,7 +15,7 @@ with httpx.Client(timeout=10) as c:  # trust_env: HTTPS_PROXY, HTTP_PROXY, NO_PR
                 r = c.get(op["arg"])
             else:
                 r = c.post(os.environ["OPENAI_BASE_URL"] + "/chat/completions",
-                           json={"model": "x", "messages": [{"role": "user", "content": op["arg"]}]},
+                           json={"model": "qwen3.8-27b", "messages": [{"role": "user", "content": op["arg"]}]},
                            headers={"Authorization": "Bearer " + os.environ["OPENAI_API_KEY"]})
             codes.append(r.status_code)
         except httpx.TransportError:
