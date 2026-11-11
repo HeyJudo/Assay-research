@@ -62,8 +62,10 @@ def test_env_routing_and_allowlist(tmp_path, monkeypatch):
     assert env["OPENAI_BASE_URL"] == "http://b/v1"
     assert env["OPENAI_API_KEY"] == "k"
     proxy = f"http://{rec.id}:none@p:1"
-    assert env["HTTPS_PROXY"] == env["HTTP_PROXY"] == env["https_proxy"] == env["http_proxy"] == proxy
-    assert env["NO_PROXY"] == env["no_proxy"] == "localhost,127.0.0.1"
+    assert env["HTTPS_PROXY"] == env["HTTP_PROXY"] == proxy
+    assert env["NO_PROXY"] == "localhost,127.0.0.1"
+    if os.name != "nt":  # Windows env names are case-insensitive, so the lowercase twins are invisible there
+        assert env["https_proxy"] == env["http_proxy"] == proxy and env["no_proxy"] == "localhost,127.0.0.1"
     assert env["SSL_CERT_FILE"] == "/ca.pem"
     assert env["REQUESTS_CA_BUNDLE"] == "/ca.pem"
     assert env["TAVILY_API_KEY"] == ""
