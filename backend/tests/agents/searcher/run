@@ -1,0 +1,23 @@
+#!/usr/bin/env python3
+"""Test agent: ASSAY_TASK is a JSON list of {"op": search|fetch|llm, "arg": str}. Writes the status codes as JSON."""
+import json
+import os
+
+import httpx
+
+codes = []
+with httpx.Client(timeout=10) as c:  # trust_env: HTTPS_PROXY, HTTP_PROXY, NO_PROXY, SSL_CERT_FILE; no retries
+    for op in json.loads(os.environ["ASSAY_TASK"]):
+        try:
+            if op["op"] == "search":
+                r = c.post("https://api.tavily.com/search", json={"query": op["arg"]})
+            elif op["op"] == "fetch":
+                r = c.get(op["arg"])
+            else:
+                r = c.post(os.environ["OPENAI_BASE_URL"] + "/chat/completions",
+                           json={"model": "x", "messages": [{"role": "user", "content": op["arg"]}]},
+                           headers={"Authorization": "Bearer " + os.environ["OPENAI_API_KEY"]})
+            codes.append(r.status_code)
+        except httpx.TransportError:
+            codes.append(0)
+open(os.environ["ASSAY_OUTPUT"], "w").write(json.dumps(codes))

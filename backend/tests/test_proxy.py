@@ -187,11 +187,24 @@ def test_log_lines(proxy):
     new = log_lines(proxy)[n:]
     assert all(isinstance(x.pop("t"), float) for x in new)
     assert new == [
-        {"kind": "search", "query": "free threaded build", "results": [FREE, JIT]},
-        {"kind": "extract", "urls": [JIT], "results": [JIT]},
-        {"kind": "fetch", "url": FREE, "results": [FREE]},
-        {"kind": "fetch", "url": "https://docs-python.invalid/nope", "results": []},
+        {"kind": "search", "query": "free threaded build", "run_id": None, "results": [FREE, JIT]},
+        {"kind": "extract", "urls": [JIT], "run_id": None, "results": [JIT]},
+        {"kind": "fetch", "url": FREE, "run_id": None, "results": [FREE]},
+        {"kind": "fetch", "url": "https://docs-python.invalid/nope", "run_id": None, "results": []},
     ]
+
+
+def test_log_lines_carry_run_tag(proxy):
+    n = len(log_lines(proxy))
+    ca = proxy.log.parent / "mitmproxy-ca-cert.pem"
+    with httpx.Client(proxy=f"http://run_t1:x@127.0.0.1:{proxy.port}",
+                      verify=ssl.create_default_context(cafile=str(ca)), timeout=10) as c:
+        search(c, query="free threaded build")
+        c.get(FREE)
+        c.get("http://not-in-pool.invalid/x")
+    search(proxy, query="free threaded build")
+    new = log_lines(proxy)[n:]
+    assert [x["run_id"] for x in new] == ["run_t1", "run_t1", "run_t1", None]
 
 
 def test_localhost_is_not_passed_through(proxy):

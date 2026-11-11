@@ -6,6 +6,7 @@ import sys
 from pathlib import Path
 
 import pytest
+from test_proxy import POOL, launch, wait_up
 
 from assay import runner, store
 from assay.models import RunRecord, Task
@@ -60,7 +61,8 @@ def test_env_routing_and_allowlist(tmp_path, monkeypatch):
     env = json.loads(rec.output.text)
     assert env["OPENAI_BASE_URL"] == "http://b/v1"
     assert env["OPENAI_API_KEY"] == "k"
-    assert env["HTTPS_PROXY"] == "http://p:1"
+    assert env["HTTPS_PROXY"] == env["HTTP_PROXY"] == f"http://{rec.id}:x@p:1"
+    assert env["NO_PROXY"] == "localhost,127.0.0.1"
     assert env["SSL_CERT_FILE"] == "/ca.pem"
     assert env["REQUESTS_CA_BUNDLE"] == "/ca.pem"
     assert env["TAVILY_API_KEY"] == ""
@@ -214,3 +216,22 @@ def test_cli_drops_empty_models(tmp_path, monkeypatch):
          "--agent-version", "0.1", "--models", "a,,b", "--prompt-hash", "h"],
         cwd=BACKEND, env={**os.environ, "ASSAY_DB": str(db)}, capture_output=True, text=True, check=True)
     assert store.get(out.stdout.strip()).config.models == ["a", "b"]
+
+
+def test_runner_through_real_proxy(tmp_path):
+    p, port, ca, log, out = launch(tmp_path)
+    try:
+        wait_up(p, port, ca, tmp_path)
+        ops = [{"op": "search", "arg": "free threaded build"}, {"op": "fetch", "arg": "http://not-in-pool.invalid/x"}]
+        task = TASK.model_copy(update={"prompt": json.dumps(ops)})
+        rec = runner.run_once(BACKEND / "tests" / "agents" / "searcher", task, **CFG,
+                              https_proxy=f"http://127.0.0.1:{port}", ca_cert=str(ca))
+        assert rec.status == "done", rec.steps
+        assert json.loads(rec.output.text) == [200, 404]
+        lines = [json.loads(x) for x in log.read_text().splitlines()]
+        assert [x["kind"] for x in lines] == ["search", "fetch"]
+        assert {x["run_id"] for x in lines} == {rec.id}
+    finally:
+        p.kill()
+        p.wait()
+        out.close()

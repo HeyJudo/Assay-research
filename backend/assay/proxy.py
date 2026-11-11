@@ -14,11 +14,12 @@ Pool file, data/pools/<task_id>.json (practice pools: data/practice/pools/):
      "docs": [{"url", "title", "content", "published_date"}]}
 
 Behavior (PRD section 6):
-- No pass-through: localhost is 404 like any non-pool URL. The runner sets NO_PROXY=localhost,127.0.0.1.
+- No pass-through: localhost is 404 like any non-pool URL. The runner sets NO_PROXY=localhost,127.0.0.1 so agents skip the proxy for local calls (Bifrost).
 - api.tavily.com POST /search and /extract are answered from the pool.
 - Any other URL in the pool is served as minimal HTML. Everything else is 404.
 - One JSONL line per search / extract / fetch is appended to ASSAY_SEARCH_LOG.
 """
+import base64
 import html
 import json
 import os
@@ -62,6 +63,7 @@ def parse(flow):
 
 class Proxy:
     def __init__(self):
+        self.tags = {}  # client connection id -> run id, taken from the CONNECT that opened the tunnel
         # KeyError on a missing env var: fail loudly at startup.
         with open(os.environ["ASSAY_POOL_FILE"], encoding="utf-8") as f:
             self.docs = json.load(f)["docs"]
@@ -79,8 +81,24 @@ class Proxy:
         # (tcp_start cannot stop it). With rawtcp off they hit the HTTP parser and fail.
         ctx.options.rawtcp = False
 
-    def write(self, kind, results, **key):
-        self.log.write(json.dumps({"t": time.time(), "kind": kind, **key, "results": results}) + "\n")
+    def run_id(self, flow):
+        """Username of Basic Proxy-Authorization: on the request itself, else on its tunnel's CONNECT."""
+        auth = flow.request.headers.get("Proxy-Authorization", "")
+        if auth.lower().startswith("basic "):
+            try:
+                return base64.b64decode(auth[6:]).decode().split(":", 1)[0]
+            except ValueError:
+                return None
+        return self.tags.get(flow.client_conn.id)
+
+    def http_connect(self, flow: http.HTTPFlow):
+        rid = self.run_id(flow)
+        if rid:
+            self.tags[flow.client_conn.id] = rid
+
+    def write(self, flow, kind, results, **key):
+        self.log.write(json.dumps({"t": time.time(), "kind": kind, **key, "run_id": self.run_id(flow),
+                                   "results": results}) + "\n")
         self.log.flush()
 
     def request(self, flow: http.HTTPFlow):
@@ -131,7 +149,7 @@ class Proxy:
             if body.get("topic") == "news":  # real Tavily only returns dates for news
                 r["published_date"] = d.get("published_date")
             results.append(r)
-        self.write("search", [r["url"] for r in results], query=query)
+        self.write(flow, "search", [r["url"] for r in results], query=query)
         flow.response = http.Response.make(
             200,
             json.dumps({"query": query, "follow_up_questions": None, "answer": None, "images": [],
@@ -148,7 +166,7 @@ class Proxy:
             raise BadRequest("urls must be a non-empty string or list of strings")
         found = [self.by_url[norm(u)] for u in urls if norm(u) in self.by_url]
         failed = [u for u in urls if norm(u) not in self.by_url]
-        self.write("extract", [d["url"] for d in found], urls=urls)
+        self.write(flow, "extract", [d["url"] for d in found], urls=urls)
         flow.response = http.Response.make(
             200,
             json.dumps({
@@ -164,7 +182,7 @@ class Proxy:
     def fetch(self, flow):
         url = flow.request.url
         d = self.by_url.get(norm(url))
-        self.write("fetch", [d["url"]] if d else [], url=url)
+        self.write(flow, "fetch", [d["url"]] if d else [], url=url)
         if not d:
             flow.response = http.Response.make(404, b"not in pool")
             return

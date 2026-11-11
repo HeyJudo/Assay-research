@@ -11,6 +11,7 @@ import time
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
+from urllib.parse import urlsplit, urlunsplit
 
 from assay import store
 from assay.models import RunConfig, RunMetrics, RunOutput, RunRecord, Step, Task
@@ -37,6 +38,7 @@ def run_once(agent_dir: Path, task: Task, *, agent_version: str, models: list[st
              repeat: int = 1, trap=None, trap_seed=None, pool_version="v1") -> RunRecord:
     if not (agent_version and models and prompt_hash) or not all(m.strip() for m in models):
         raise ValueError("agent_version, models and prompt_hash are required")
+    rid = f"run_{uuid.uuid4().hex[:12]}"
     started = datetime.now(timezone.utc)
     env = {k: os.environ[k] for k in OS_BASICS if k in os.environ}
     # Blank every .env.example name so load_dotenv(override=False) in the agent can't fill real keys from the repo-root .env.
@@ -49,9 +51,14 @@ def run_once(agent_dir: Path, task: Task, *, agent_version: str, models: list[st
         pass
     env.update(ASSAY_TASK=task.prompt, ASSAY_AS_OF=task.as_of_date)
     for k, v in {"OPENAI_BASE_URL": openai_base_url, "OPENAI_API_KEY": openai_api_key,
-                 "HTTPS_PROXY": https_proxy, "SSL_CERT_FILE": ca_cert, "REQUESTS_CA_BUNDLE": ca_cert}.items():
+                 "SSL_CERT_FILE": ca_cert, "REQUESTS_CA_BUNDLE": ca_cert}.items():
         if v:
             env[k] = v
+    if https_proxy:
+        # The proxy tells runs apart by this userinfo (password is a dummy so clients send Basic auth).
+        u = urlsplit(https_proxy)
+        env["HTTPS_PROXY"] = env["HTTP_PROXY"] = urlunsplit(u._replace(netloc=f"{rid}:x@{u.hostname}" + (f":{u.port}" if u.port else "")))
+        env["NO_PROXY"] = "localhost,127.0.0.1"
 
     text, error = "", None
     t0 = time.monotonic()
@@ -98,7 +105,7 @@ def run_once(agent_dir: Path, task: Task, *, agent_version: str, models: list[st
     steps = [Step(i=1, t=duration, kind="error", detail=error, model=None, phase="write",
                   tokens=0, cost_usd=0)] if error else []
     return RunRecord(
-        id=f"run_{uuid.uuid4().hex[:12]}", batch_id=batch_id or f"b_{uuid.uuid4().hex[:12]}",
+        id=rid, batch_id=batch_id or f"b_{uuid.uuid4().hex[:12]}",
         agent_id=agent_dir.name, task_id=task.id, task_type=task.type, trap=trap, repeat=repeat,
         status="error" if error else "done",
         started_at=started.strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z", duration_s=duration,
