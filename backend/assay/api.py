@@ -115,9 +115,11 @@ def create_batch(req: BatchRequest) -> BatchCreated:
         runner.start_batch(bid, req.agents, task, req.trap, emit=emit,
                            bifrost_url=os.environ.get("BIFROST_URL") or "http://localhost:8080/v1",
                            vks=[os.environ.get(f"BIFROST_RUN_VK_{i}", "") for i in range(1, 10)])
-    except (ValueError, RuntimeError) as e:
-        del BATCHES[bid]
-        raise HTTPException(422 if isinstance(e, ValueError) else 503, str(e))
+    except Exception as e:
+        del BATCHES[bid]  # any failure frees the slot, or every later POST is a 409
+        if isinstance(e, (ValueError, RuntimeError)):
+            raise HTTPException(422 if isinstance(e, ValueError) else 503, str(e))
+        raise
     return BatchCreated(batch_id=bid)
 
 
@@ -137,7 +139,7 @@ async def batch_stream(batch_id: str, request: Request):
     """SSE. Each message has `id: <n>`, so EventSource resumes after Last-Event-ID on reconnect."""
     b = _batch(batch_id)
     try:
-        start = int(request.headers.get("last-event-id", "-1")) + 1
+        start = max(0, int(request.headers.get("last-event-id", "-1")) + 1)
     except ValueError:
         start = 0
 

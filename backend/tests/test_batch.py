@@ -140,3 +140,18 @@ def test_start_batch_refuses_bad_setup(env):
     with pytest.raises(ValueError, match="no pool"):
         runner.start_batch("b_x", ["a"], task.model_copy(update={"id": "nope"}), None, vks=["k"] * 3, **kw)
     assert store.list_runs() == []
+
+
+def test_run_that_raises_still_ends(env, monkeypatch):
+    srv, _ = env
+    real = runner.run_once
+
+    def flaky(*a, on_start, **kw):  # the run starts, then the runner itself fails (e.g. SQLite locked)
+        return real(*a, on_start=lambda rec: (on_start(rec), 1 / 0), **kw)
+
+    monkeypatch.setattr(runner, "run_once", flaky)
+    events = run(["a"], None, srv, ["k1", "k2", "k3"])
+    done = [d for n, d in events if n == "run_done"]
+    assert [d.status for d in done] == ["error"] * 3
+    assert {r.status for r in store.list_runs(batch_id="b_test")} == {"error"}
+    assert events[-1][0] == "batch_done"

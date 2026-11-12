@@ -125,3 +125,18 @@ def test_missing_run_key_refused(client, monkeypatch):
 def test_unknown_batch_404(client):
     assert client.get("/api/batches/b_nope").status_code == 404
     assert client.get("/api/batches/b_nope/stream").status_code == 404
+
+
+def test_unexpected_start_error_frees_the_slot(client, monkeypatch):
+    def boom(*a, **kw):
+        raise KeyError("docs")
+    monkeypatch.setattr(runner, "start_batch", boom)
+    with pytest.raises(KeyError):
+        client.post("/api/batches", json=body())
+    assert api.BATCHES == {}
+
+
+def test_negative_last_event_id_replays_from_start(client):
+    bid = client.post("/api/batches", json=body()).json()["batch_id"]
+    full = read_stream(client, bid)
+    assert read_stream(client, bid, **{"Last-Event-ID": "-5"}) == full

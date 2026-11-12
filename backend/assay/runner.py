@@ -205,7 +205,8 @@ def _mitmdump(tmp: Path, script: str, args: list[str], env: dict) -> tuple[subpr
             if (tmp / "mitmproxy-ca-cert.pem").exists():
                 return p, port
         except OSError:
-            time.sleep(0.1)
+            pass
+        time.sleep(0.1)
     p.kill()
     p.wait()
     raise RuntimeError(f"{script} did not start: {out.read_text('utf-8', errors='replace')[-500:]}")
@@ -263,15 +264,25 @@ def start_batch(batch_id: str, agent_ids: list[str], task: Task, trap, *, emit, 
     def one(slot, agent_id, repeat):
         agent_dir, meta = agents[agent_id]
 
+        begun = []
+
         def started(rec):
+            begun.append(rec)
             store.save(rec)
             emit("run_started", RunStartedEvent(run_id=rec.id, batch_id=batch_id, agent_id=agent_id, repeat=repeat,
                                                 started_at=rec.started_at))
 
-        rec = run_once(agent_dir, task, agent_version=meta["version"], models=meta["models"],
-                       prompt_hash=meta["prompt_hash"], openai_base_url=bifrost_url, openai_api_key=vks[slot],
-                       timeout_s=timeout_s, batch_id=batch_id, repeat=repeat, trap=trap,
-                       pool_version=pool["pool_version"], on_start=started, **kw)
+        try:
+            rec = run_once(agent_dir, task, agent_version=meta["version"], models=meta["models"],
+                           prompt_hash=meta["prompt_hash"], openai_base_url=bifrost_url, openai_api_key=vks[slot],
+                           timeout_s=timeout_s, batch_id=batch_id, repeat=repeat, trap=trap,
+                           pool_version=pool["pool_version"], on_start=started, **kw)
+        except Exception as e:
+            if not begun:
+                raise
+            # A started run must end, or it stays `running` forever.
+            rec = begun[0].model_copy(update=dict(status="error", duration_s=0.0, steps=[Step(
+                i=1, t=0, kind="error", detail=f"runner: {e!r}"[:500], model=None, phase="write", tokens=0, cost_usd=0)]))
         store.save(rec)
         # ponytail: steps go out when the run ends, live steps come with the proxy+Bifrost log timeline
         for step in rec.steps:
