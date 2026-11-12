@@ -316,9 +316,8 @@ def test_on_start_gets_running_record_first(tmp_path):
     assert rec.status == "done"
 
 
-# Bifrost's 402 body (docs/features/governance/virtual-keys.mdx), as the OpenAI SDK prints it on a crash.
-BIFROST_402 = ("openai.APIStatusError: Error code: 402 - {'type': 'budget_exceeded', 'status_code': 402, "
-               "'error': {'message': 'Budget exceeded: virtual_key vk-run-1 budget exceeded: 0.5000 >= 0.5000 dollars'}}")
+# Bifrost's real 402 (captured live from a run-slot key with a spent budget), as an agent prints it on a crash.
+BIFROST_402 = "Error code: 402 - " + (BACKEND / "tests" / "fixtures" / "bifrost_402.json").read_text("utf-8").strip()
 
 
 def test_bifrost_budget_refusal_is_budget_exceeded(tmp_path):
