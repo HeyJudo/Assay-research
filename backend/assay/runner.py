@@ -1,21 +1,36 @@
-"""Runs one agent on one task (PRD §8 agent contract) and returns a RunRecord."""
+"""Runs one agent on one task (PRD §8 agent contract) and returns a RunRecord. start_batch runs a batch in parallel."""
 
 import argparse
+import json
 import os
 import re
+import shutil
 import signal
+import socket
 import subprocess
 import sys
 import tempfile
+import threading
 import time
+import traceback
 import uuid
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import get_args
 from urllib.parse import urlsplit, urlunsplit
 
 from assay import store
-from assay.models import RunConfig, RunMetrics, RunOutput, RunRecord, Step, Task, Trap
+from assay.models import (BatchDoneEvent, RunConfig, RunDoneEvent, RunMetrics, RunOutput, RunRecord, RunStartedEvent,
+                          Step, StepEvent, Task, Trap)
+
+BACKEND = Path(__file__).resolve().parents[1]
+DATA = BACKEND.parent / "data"
+AGENTS_DIR = BACKEND / "agents"  # one folder per agent id: `run` + agent.json {"version", "models", "prompt_hash"}
+TASK_DIRS = [DATA / "tasks", DATA / "practice" / "tasks"]
+POOL_DIRS = [DATA / "pools", DATA / "practice" / "pools"]
+SAFE_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9_-]*")
+REPEATS = 3  # PRD §13
 
 # Must match PROXY_TRAPS in proxy.py. model_outage is handled by outage.py, not the search proxy.
 PROXY_TRAPS = {"fake_article", "hidden_instruction", "search_outage"}
@@ -148,6 +163,135 @@ def run_once(agent_dir: Path, task: Task, *, agent_version: str, models: list[st
     status = "budget_exceeded" if budget else "error" if error else "done"
     return base.model_copy(update=dict(status=status, duration_s=duration, output=RunOutput(text=text, abstained=False),
                                        steps=steps))
+
+
+def find_agent(agent_id: str) -> tuple[Path, dict] | None:
+    d = AGENTS_DIR / agent_id
+    if not SAFE_ID.fullmatch(agent_id) or not (d / "run").is_file() or not (d / "agent.json").is_file():
+        return None
+    return d, json.loads((d / "agent.json").read_text("utf-8"))
+
+
+def find_task(task_id: str) -> Task | None:
+    for d in TASK_DIRS if SAFE_ID.fullmatch(task_id) else []:
+        if (d / f"{task_id}.json").is_file():
+            return Task.model_validate_json((d / f"{task_id}.json").read_text("utf-8"))
+    return None
+
+
+def find_pool(task_id: str) -> Path | None:
+    for d in POOL_DIRS if SAFE_ID.fullmatch(task_id) else []:
+        if (d / f"{task_id}.json").is_file():
+            return d / f"{task_id}.json"
+    return None
+
+
+def _mitmdump(tmp: Path, script: str, args: list[str], env: dict) -> tuple[subprocess.Popen, int]:
+    """Start one of our mitmproxy add-ons on a free local port and wait until it listens."""
+    with socket.socket() as s:  # ponytail: port can be taken between close and bind, retry the batch if so
+        s.bind(("127.0.0.1", 0))
+        port = s.getsockname()[1]
+    out = tmp / f"{script}.out"
+    with open(out, "wb") as f:
+        p = subprocess.Popen([sys.executable, "-c", "from mitmproxy.tools.main import mitmdump; mitmdump()",
+                              "-s", str(BACKEND / "assay" / script), "--listen-host", "127.0.0.1",
+                              "--listen-port", str(port), "--set", f"confdir={tmp}", *args],
+                             cwd=BACKEND, env={**os.environ, **env}, stdout=f, stderr=subprocess.STDOUT)
+    for _ in range(300):
+        if p.poll() is not None:
+            break
+        try:
+            socket.create_connection(("127.0.0.1", port), timeout=0.2).close()
+            if (tmp / "mitmproxy-ca-cert.pem").exists():
+                return p, port
+        except OSError:
+            time.sleep(0.1)
+    p.kill()
+    p.wait()
+    raise RuntimeError(f"{script} did not start: {out.read_text('utf-8', errors='replace')[-500:]}")
+
+
+def _stop(procs: list[subprocess.Popen], tmp: Path) -> None:
+    for p in procs:
+        p.kill()
+        p.wait()
+    shutil.rmtree(tmp, ignore_errors=True)
+
+
+def start_batch(batch_id: str, agent_ids: list[str], task: Task, trap, *, emit, bifrost_url: str,
+                vks: list[str], timeout_s: float = 600) -> threading.Thread:
+    """Run each agent REPEATS times on task, all runs in parallel. Run slot n gets vks[n-1] as its Bifrost key.
+
+    Starts the batch's search proxy (task pool + trap) and, for model_outage, the outage pass-through, then
+    returns the thread running the batch. emit(name, event) gets the SSE events from PRD §8, batch_done last.
+    Raises ValueError on a bad setup and RuntimeError when a proxy will not start, before any run starts."""
+    agents = {a: find_agent(a) for a in agent_ids}
+    for a, found in agents.items():
+        if found is None:
+            raise ValueError(f"unknown agent {a}")
+        if not all(found[1].get(k) for k in ("version", "models", "prompt_hash")):
+            raise ValueError(f"{a}/agent.json needs version, models and prompt_hash")
+    jobs = [(a, r) for a in agent_ids for r in range(1, REPEATS + 1)]
+    if len(vks) < len(jobs) or not all(vks[:len(jobs)]):
+        raise ValueError(f"set BIFROST_RUN_VK_1..{len(jobs)}: one Bifrost key per parallel run")
+    pool_file = find_pool(task.id)
+    if pool_file is None:
+        raise ValueError(f"no pool for task {task.id}")
+    pool = json.loads(pool_file.read_text("utf-8"))
+    if trap in ("fake_article", "hidden_instruction") and not any(d.get("trap") == trap for d in pool["docs"]):
+        raise ValueError(f"pool for {task.id} has no {trap} doc")
+
+    tmp = Path(tempfile.mkdtemp(prefix=f"assay-{batch_id}-"))
+    procs = []
+    try:
+        # ponytail: search log lives in tmp and goes with the batch, keep it when steps are built from it
+        p, port = _mitmdump(tmp, "proxy.py", ["--mode", "upstream:http://127.0.0.1:9", "--set", "connection_strategy=lazy",
+                                              "--set", "rawtcp=false"],
+                            {"ASSAY_POOL_FILE": str(pool_file), "ASSAY_SEARCH_LOG": str(tmp / "search.jsonl"),
+                             "ASSAY_TRAP": trap or ""})
+        procs.append(p)
+        kw = dict(https_proxy=f"http://127.0.0.1:{port}", ca_cert=str(tmp / "mitmproxy-ca-cert.pem"))
+        if trap == "model_outage":
+            u = urlsplit(bifrost_url)
+            p, port = _mitmdump(tmp, "outage.py", ["--mode", f"reverse:{u.scheme}://{u.netloc}"], {})
+            procs.append(p)
+            kw["llm_outage_url"] = f"http://127.0.0.1:{port}"
+    except BaseException:
+        _stop(procs, tmp)
+        raise
+
+    def one(slot, agent_id, repeat):
+        agent_dir, meta = agents[agent_id]
+
+        def started(rec):
+            store.save(rec)
+            emit("run_started", RunStartedEvent(run_id=rec.id, batch_id=batch_id, agent_id=agent_id, repeat=repeat,
+                                                started_at=rec.started_at))
+
+        rec = run_once(agent_dir, task, agent_version=meta["version"], models=meta["models"],
+                       prompt_hash=meta["prompt_hash"], openai_base_url=bifrost_url, openai_api_key=vks[slot],
+                       timeout_s=timeout_s, batch_id=batch_id, repeat=repeat, trap=trap,
+                       pool_version=pool["pool_version"], on_start=started, **kw)
+        store.save(rec)
+        # ponytail: steps go out when the run ends, live steps come with the proxy+Bifrost log timeline
+        for step in rec.steps:
+            emit("step", StepEvent(run_id=rec.id, step=step))
+        emit("run_done", RunDoneEvent(run_id=rec.id, status=rec.status, duration_s=rec.duration_s, metrics=rec.metrics))
+
+    def batch():
+        try:
+            with ThreadPoolExecutor(len(jobs)) as ex:
+                futures = [ex.submit(one, i, a, r) for i, (a, r) in enumerate(jobs)]
+            for f in futures:
+                if f.exception():
+                    traceback.print_exception(f.exception())
+        finally:
+            _stop(procs, tmp)
+            emit("batch_done", BatchDoneEvent(batch_id=batch_id))
+
+    t = threading.Thread(target=batch, name=batch_id, daemon=True)
+    t.start()
+    return t
 
 
 if __name__ == "__main__":
