@@ -4,6 +4,7 @@ from collections import Counter
 from pathlib import Path
 
 from assay.models import Task
+from assay.pool_builder import has, key
 
 DATA = Path(__file__).resolve().parents[2] / "data"
 TASKS = {t.id: t for t in (Task.model_validate_json(p.read_text(encoding="utf-8"))
@@ -28,7 +29,7 @@ def test_task_ids_match_files_and_every_task_has_its_pool():
     assert set(POOLS) == set(TASKS)
     for tid, pool in POOLS.items():
         assert pool["task_id"] == tid and pool["pool_version"] == "v1" and pool["docs"]
-        assert len({d["url"].split("#")[0].rstrip("/") for d in pool["docs"]}) == len(pool["docs"])
+        assert len({key(d["url"]) for d in pool["docs"]}) == len(pool["docs"])
 
 
 def test_answers_match_type():
@@ -41,7 +42,7 @@ def test_answers_match_type():
 def test_fact_answers_are_in_pool():
     for t in TASKS.values():
         if t.type == "fact":
-            assert any(t.answer.casefold() in d["content"].casefold() for d in POOLS[t.id]["docs"]), t.id
+            assert any(has(d["content"], t.answer) for d in POOLS[t.id]["docs"]), t.id
 
 
 def test_twins_mirror_their_clean_task():
@@ -59,8 +60,8 @@ def test_each_twin_has_one_planted_trap_absent_from_its_clean_pool():
     assert Counter(traps(POOLS[i])[0]["trap"] for i in TWINS) == {"fake_article": 2, "hidden_instruction": 2}
     for twin_id, clean in TWINS.items():
         [trap] = traps(POOLS[twin_id])
-        assert trap["planted"] in trap["content"]
-        assert not any(trap["planted"] in d["content"] for d in POOLS[clean.id]["docs"])
+        assert has(trap["content"], trap["planted"])
+        assert not any(has(d["content"], trap["planted"]) for d in POOLS[clean.id]["docs"])
 
 
 def test_clean_pools_have_no_traps():

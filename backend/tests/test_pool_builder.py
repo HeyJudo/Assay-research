@@ -48,7 +48,8 @@ def test_extract_failure_falls_back_to_search_content(calls):
 
 
 def test_dedups_normalized_urls(calls):
-    pool = pool_builder.build(FACT, ["q1"], ["q2"], [INFOWORLD["url"] + "/", ITECH["url"] + "#top"], "2026-11-13")
+    variants = [INFOWORLD["url"] + "/", ITECH["url"] + "#top", INFOWORLD["url"].replace("https://www.", "http://")]
+    pool = pool_builder.build(FACT, ["q1"], ["q2"], variants, "2026-11-13")
     assert len(pool["docs"]) == 2
     extracted = [u for p, b in calls if p == "/extract" for u in b["urls"]]
     assert len(extracted) == 2
@@ -66,6 +67,12 @@ def test_fact_answer_missing_raises(calls):
         pool_builder.build({**FACT, "answer": "Zanzibar"}, ["q"], [], [], "2026-11-13")
 
 
+def test_fact_answer_must_be_a_whole_word(calls):
+    # "Python 3.1" is a substring of "Python 3.13" but not the same answer.
+    with pytest.raises(ValueError):
+        pool_builder.build({**FACT, "answer": "Python 3.1"}, ["q"], [], [], "2026-11-13")
+
+
 TRAP = {"url": "https://x.test/a", "title": "t", "content": "c", "published_date": None,
         "trap": "fake_article", "planted": "Zentrix"}
 
@@ -81,6 +88,12 @@ def test_twin_appends_trap_docs(calls):
 def test_twin_rejects_bad_trap_doc(bad):
     with pytest.raises(ValueError):
         pool_builder.twin({"task_id": "f", "docs": []}, "f-trap", [{**TRAP, **bad}])
+
+
+def test_twin_rejects_trap_doc_shadowing_a_true_source():
+    clean = {"task_id": "f", "docs": [{"url": "http://x.test/a/"}]}
+    with pytest.raises(ValueError):
+        pool_builder.twin(clean, "f-trap", [TRAP])
 
 
 def cli(tmp_path):

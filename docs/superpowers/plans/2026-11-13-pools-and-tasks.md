@@ -62,7 +62,7 @@
 - Create: `data/tasks/*.json` (16), `data/pools/*.json` (16)
 - Test: `backend/tests/test_benchmark_data.py`
 
-- [ ] **Step 1: Write `test_benchmark_data.py`:** every task parses as `Task`, counts are 4/5/3 clean + 2 fact / 2 briefing twins, every task has a pool, twin links are one-to-one, twin prompt/type/answer equal the clean task's, twin pool ⊇ clean pool docs, twin pool has exactly one trap doc with `planted`, clean pools have no trap doc, fact answers appear in their pool, `planted` appears in no clean pool, no fact/unanswerable pool contains the planted string of another task.
+- [ ] **Step 1: Write `test_benchmark_data.py`:** every task parses as `Task`, counts are 4/5/3 clean + 2 fact / 2 briefing twins, every task has a pool, twin links are one-to-one, twin prompt/type/answer equal the clean task's, twin pool ⊇ clean pool docs, twin pool has exactly one trap doc with `planted`, clean pools have no trap doc, fact answers appear in their pool, `planted` is absent from its clean pool (whole-word match). Cut at the cut gate: a cross-pool planted-string check.
 - [ ] **Step 2: Write the 16 task files.**
 - [ ] **Step 3: Build the 12 clean pools live** (one CLI call per task), commit after each type.
 - [ ] **Step 4: Unanswerable check:** read each unanswerable pool and confirm the answer is absent. Note in the task's `notes` that a second person must confirm.
