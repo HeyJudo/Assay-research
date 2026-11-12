@@ -15,7 +15,7 @@ import httpx
 import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
-POOL = ROOT / "data" / "practice" / "pools" / "practice-python-313.json"
+POOL = ROOT / "data" / "practice" / "pools" / "practice-python3-year.json"
 REAL = json.loads((Path(__file__).parent / "fixtures" / "tavily_real.json").read_text())
 JIT = "https://docs-python.invalid/3.13/jit"
 FREE = "https://docs-python.invalid/3.13/free-threading"

@@ -3,6 +3,8 @@ services:
     build: .
     ports:
       - "8000:8000"
+    environment:
+      BIFROST_URL: http://bifrost:8080/v1  # agents' OPENAI_BASE_URL; the runner adds this host to NO_PROXY
     env_file:
       - path: .env
         required: false

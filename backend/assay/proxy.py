@@ -1,7 +1,7 @@
 """Assay search proxy: a mitmproxy add-on that freezes the web to a task's pool.
 
 Run from backend/ (8080 is Bifrost, so dev uses 8081):
-    ASSAY_POOL_FILE=../data/practice/pools/practice-python-313.json \
+    ASSAY_POOL_FILE=../data/practice/pools/practice-python3-year.json \
     ASSAY_SEARCH_LOG=search.jsonl \
     uv run mitmdump -s assay/proxy.py --listen-port 8081         --mode upstream:http://127.0.0.1:9 --set connection_strategy=lazy --set rawtcp=false
 

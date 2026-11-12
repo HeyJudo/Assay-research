@@ -176,7 +176,16 @@
       }
     ],
     "budgets": [
-      { "id": "budget-judge", "virtual_key_id": "vk-judge", "max_limit": 10.0, "reset_duration": "1M" }
+      { "id": "budget-judge", "virtual_key_id": "vk-judge", "max_limit": 10.0, "reset_duration": "1M" },
+      { "id": "budget-run-1", "virtual_key_id": "vk-run-1", "max_limit": 0.5, "reset_duration": "1d" },
+      { "id": "budget-run-2", "virtual_key_id": "vk-run-2", "max_limit": 0.5, "reset_duration": "1d" },
+      { "id": "budget-run-3", "virtual_key_id": "vk-run-3", "max_limit": 0.5, "reset_duration": "1d" },
+      { "id": "budget-run-4", "virtual_key_id": "vk-run-4", "max_limit": 0.5, "reset_duration": "1d" },
+      { "id": "budget-run-5", "virtual_key_id": "vk-run-5", "max_limit": 0.5, "reset_duration": "1d" },
+      { "id": "budget-run-6", "virtual_key_id": "vk-run-6", "max_limit": 0.5, "reset_duration": "1d" },
+      { "id": "budget-run-7", "virtual_key_id": "vk-run-7", "max_limit": 0.5, "reset_duration": "1d" },
+      { "id": "budget-run-8", "virtual_key_id": "vk-run-8", "max_limit": 0.5, "reset_duration": "1d" },
+      { "id": "budget-run-9", "virtual_key_id": "vk-run-9", "max_limit": 0.5, "reset_duration": "1d" }
     ]
   },
   "client": { "enforce_auth_on_inference": true }
