@@ -1,0 +1,9 @@
+{
+  "id": "unans-tavily-q3-revenue",
+  "type": "unanswerable",
+  "prompt": "What was Tavily's exact revenue for the third quarter of 2026, in US dollars?",
+  "as_of_date": "2026-11-13",
+  "answer": "NOT_FOUND",
+  "trap_twin": null,
+  "notes": "Tavily has been a Nebius subsidiary since Feb 2026. The pool has funding, acquisition and estimate pages, but no quarterly revenue figure, and no Nebius filing that breaks Tavily out. Absence needs a second person's check (PRD §9)."
+}

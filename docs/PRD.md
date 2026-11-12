@@ -1,7 +1,7 @@
 # Assay: PRD v3 (build version)
 
 **Tagline:** Know which research agent to trust, and why.
-**Status (Nov 10):** lead lane: day-0 scaffold, search proxy, runner + SQLite store, and Bifrost (models, run-slot keys, judge budget) are merged and tested. Not yet connected end to end. Briefing Agent, graders and real screens not started.
+**Status (Nov 13):** lead lane: day-0 scaffold, search proxy with all 4 traps, runner + SQLite store, Bifrost (models, run-slot keys, judge budget) and the batch API contract models are merged and tested. Task suite (12 tasks + 4 trapped twins) and their frozen pools are built (PR #9). Parallel batch runs in progress. Not yet connected end to end. Briefing Agent, graders and real screens not started.
 **Tracks:** PS02 Bifrost (primary, research-agent category) + PS05 Tavily (integration checkbox).
 **Deadline:** submit Nov 15 by afternoon (hard limit 11:59 PM). Live judging Nov 29.
 This is the only PRD. It replaces v1 and v2.
@@ -221,7 +221,7 @@ All 6 screens, built first against fake run records in `web/src/fixtures/` · sl
 |---|---|---|---|---|
 | **Sun Nov 9** | ✅ Repo skeleton (`backend/`, `web/`, `data/`, `bifrost/`), docker-compose with Bifrost, FastAPI serving 4 fake run records, Vite + shadcn scaffold with 6 empty routes, `.env.example`, README stub | Install Python 3.12 + uv + Node 20; make free keys (Groq, OpenRouter, Gemini, Cerebras) + redeem Tavily `GEEKROOM2` | Install Node 20; same keys; read the fixtures | Jude: `docker compose up` shows fake data. Frontend: `npm run dev` shows fixtures. Backend: Bifrost runs via `npx -y @maximhq/bifrost` |
 | Mon Nov 10 | ✅ Proxy in repo · ✅ runner runs one agent (stub) on one task, record saved · ✅ Bifrost models, run-slot keys, judge budget | Baseline agent passes the contract on a practice task | Home + Receipt on fixtures | **Baseline runs 1 task end to end: proxy → Bifrost → record → receipt** |
-| Tue Nov 11 | Pools + traps built; GPT Researcher wrapped; SSE stream | Cheap-first + Evidence-gated; exact/abstention/trap graders | Leaderboard + sliders, Run screen with live grid on fake stream | All 4 agents run; 12 tasks + 4 twins written and verified |
+| Tue Nov 11 | ✅ Pools + traps built · GPT Researcher wrapped · SSE stream | Cheap-first + Evidence-gated; exact/abstention/trap graders | Leaderboard + sliders, Run screen with live grid on fake stream | All 4 agents run; ✅ 12 tasks + 4 twins written (second-person answer check pending, §9) |
 | Wed Nov 12 | Full benchmark starts overnight; `/api/batches` live | Claim judge done; hand-labeling; judge agreement | Compare + Briefing screens | Live Run button works end to end locally |
 | Thu Nov 13 | Deploy to HF Space; rerun failures | `/api/brief` live with Tavily | Switch all screens to real API | Deployed URL works with real results |
 | Fri Nov 14 | Write findings for Home; README | README + deck slides for agent/graders | UX polish, screenshots, demo video | Everything submittable |
@@ -250,4 +250,6 @@ All 6 screens, built first against fake run records in `web/src/fixtures/` · sl
 
 **Decided (Nov 10):** free Llama 3.x models are no longer served by Groq or Cerebras · main = Qwen 3.8 27B (`qwen3.8-27b`, Groq + Cerebras failover) · small = Gemma 4 26B (`gemma-4-26b-a4b-it`, Gemini + OpenRouter, weaker failover) · model-outage trap fails the agent's first 3 LLM calls with 503, not 2, because the OpenAI SDK retries a 503 twice by default and would absorb 2.
 
-**Still open:** the 12 tasks' content (Nov 10–11) · repo name (suggest `assay-research`).
+**Decided (Nov 13):** task suite in `data/tasks/`: 4 fact, 5 briefing (Maxim AI, Tavily, Nebius, Mistral AI, Cohere), 3 unanswerable, 4 trapped twins (2 fact + 2 briefing; 2 fake article + 2 hidden instruction), `as_of_date` 2026-11-13 · pools built once by `pool_builder.py`, never overwritten · each trap doc carries `planted`, the string graders match as a whole word for `trap_fell`.
+
+**Still open:** repo name (suggest `assay-research`).

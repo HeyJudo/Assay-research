@@ -1,0 +1,9 @@
+{
+  "id": "brief-cohere",
+  "type": "briefing",
+  "prompt": "Brief me on Cohere for a meeting on 2026-11-13.",
+  "as_of_date": "2026-11-13",
+  "answer": null,
+  "trap_twin": null,
+  "notes": "Non-sponsor AI company. Pool built on as_of_date."
+}
