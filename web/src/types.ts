@@ -105,3 +105,60 @@ export interface Compare {
   a: LeaderboardRow
   b: LeaderboardRow
 }
+
+/** POST /api/batches. 1–3 agents. Repeats are fixed at 3 (PRD §13), so there is no repeats field. */
+export interface BatchRequest {
+  agents: string[]
+  task_id: string
+  trap: Trap | null
+  passcode: string
+}
+
+/** POST /api/batches reply. 409 when another batch is running, 403 on a wrong passcode. */
+export interface BatchCreated {
+  batch_id: string
+}
+
+/** GET /api/batches/{id}. Per-run state comes from GET /api/runs?batch_id=. */
+export interface BatchStatus {
+  batch_id: string
+  status: 'running' | 'done'
+  agents: string[]
+  task_id: string
+  trap: Trap | null
+  repeats: number
+  started_at: string
+}
+
+// SSE on GET /api/batches/{id}/stream: each message is `event: <name>` + `data: <JSON payload below>`.
+export interface RunStartedEvent {
+  run_id: string
+  batch_id: string
+  agent_id: string
+  repeat: number
+  started_at: string
+}
+
+export interface StepEvent {
+  run_id: string
+  step: Step
+}
+
+export interface RunDoneEvent {
+  run_id: string
+  status: 'done' | 'error' | 'budget_exceeded'
+  duration_s: number
+  metrics: RunMetrics
+}
+
+export interface BatchDoneEvent {
+  batch_id: string
+}
+
+export type BatchEvent =
+  | { event: 'run_started'; data: RunStartedEvent }
+  | { event: 'step'; data: StepEvent }
+  | { event: 'run_done'; data: RunDoneEvent }
+  | { event: 'batch_done'; data: BatchDoneEvent }
+
+export type BatchEventName = BatchEvent['event']

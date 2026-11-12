@@ -1,0 +1,587 @@
+[
+  {
+    "event": "run_started",
+    "data": {
+      "run_id": "run_fixture_baseline_1",
+      "batch_id": "b_fixture",
+      "agent_id": "briefing-baseline",
+      "repeat": 1,
+      "started_at": "2026-11-13T10:00:01Z"
+    }
+  },
+  {
+    "event": "run_started",
+    "data": {
+      "run_id": "run_fixture_baseline_2",
+      "batch_id": "b_fixture",
+      "agent_id": "briefing-baseline",
+      "repeat": 2,
+      "started_at": "2026-11-13T10:00:02Z"
+    }
+  },
+  {
+    "event": "run_started",
+    "data": {
+      "run_id": "run_fixture_baseline_3",
+      "batch_id": "b_fixture",
+      "agent_id": "briefing-baseline",
+      "repeat": 3,
+      "started_at": "2026-11-13T10:00:03Z"
+    }
+  },
+  {
+    "event": "run_started",
+    "data": {
+      "run_id": "run_fixture_first_1",
+      "batch_id": "b_fixture",
+      "agent_id": "briefing-cheap-first",
+      "repeat": 1,
+      "started_at": "2026-11-13T10:00:04Z"
+    }
+  },
+  {
+    "event": "run_started",
+    "data": {
+      "run_id": "run_fixture_first_2",
+      "batch_id": "b_fixture",
+      "agent_id": "briefing-cheap-first",
+      "repeat": 2,
+      "started_at": "2026-11-13T10:00:05Z"
+    }
+  },
+  {
+    "event": "run_started",
+    "data": {
+      "run_id": "run_fixture_first_3",
+      "batch_id": "b_fixture",
+      "agent_id": "briefing-cheap-first",
+      "repeat": 3,
+      "started_at": "2026-11-13T10:00:06Z"
+    }
+  },
+  {
+    "event": "step",
+    "data": {
+      "run_id": "run_fixture_baseline_1",
+      "step": {
+        "i": 1,
+        "t": 0.5,
+        "kind": "llm",
+        "detail": "plan queries",
+        "model": "qwen3.8-27b",
+        "phase": "plan",
+        "tokens": 380,
+        "cost_usd": 4e-05
+      }
+    }
+  },
+  {
+    "event": "step",
+    "data": {
+      "run_id": "run_fixture_baseline_2",
+      "step": {
+        "i": 1,
+        "t": 0.5,
+        "kind": "llm",
+        "detail": "plan queries",
+        "model": "qwen3.8-27b",
+        "phase": "plan",
+        "tokens": 380,
+        "cost_usd": 4e-05
+      }
+    }
+  },
+  {
+    "event": "step",
+    "data": {
+      "run_id": "run_fixture_baseline_3",
+      "step": {
+        "i": 1,
+        "t": 0.5,
+        "kind": "llm",
+        "detail": "plan queries",
+        "model": "qwen3.8-27b",
+        "phase": "plan",
+        "tokens": 380,
+        "cost_usd": 4e-05
+      }
+    }
+  },
+  {
+    "event": "step",
+    "data": {
+      "run_id": "run_fixture_first_1",
+      "step": {
+        "i": 1,
+        "t": 0.5,
+        "kind": "llm",
+        "detail": "plan queries",
+        "model": "gemma-4-26b-a4b-it",
+        "phase": "plan",
+        "tokens": 380,
+        "cost_usd": 4e-05
+      }
+    }
+  },
+  {
+    "event": "step",
+    "data": {
+      "run_id": "run_fixture_first_2",
+      "step": {
+        "i": 1,
+        "t": 0.5,
+        "kind": "llm",
+        "detail": "plan queries",
+        "model": "gemma-4-26b-a4b-it",
+        "phase": "plan",
+        "tokens": 380,
+        "cost_usd": 4e-05
+      }
+    }
+  },
+  {
+    "event": "step",
+    "data": {
+      "run_id": "run_fixture_first_3",
+      "step": {
+        "i": 1,
+        "t": 0.5,
+        "kind": "llm",
+        "detail": "plan queries",
+        "model": "gemma-4-26b-a4b-it",
+        "phase": "plan",
+        "tokens": 380,
+        "cost_usd": 4e-05
+      }
+    }
+  },
+  {
+    "event": "step",
+    "data": {
+      "run_id": "run_fixture_baseline_1",
+      "step": {
+        "i": 2,
+        "t": 1.8,
+        "kind": "search",
+        "detail": "Tavily company news November 2026",
+        "model": null,
+        "phase": "search",
+        "tokens": 0,
+        "cost_usd": 0
+      }
+    }
+  },
+  {
+    "event": "step",
+    "data": {
+      "run_id": "run_fixture_baseline_2",
+      "step": {
+        "i": 2,
+        "t": 1.8,
+        "kind": "search",
+        "detail": "Tavily company news November 2026",
+        "model": null,
+        "phase": "search",
+        "tokens": 0,
+        "cost_usd": 0
+      }
+    }
+  },
+  {
+    "event": "step",
+    "data": {
+      "run_id": "run_fixture_baseline_3",
+      "step": {
+        "i": 2,
+        "t": 1.8,
+        "kind": "search",
+        "detail": "Tavily company news November 2026",
+        "model": null,
+        "phase": "search",
+        "tokens": 0,
+        "cost_usd": 0
+      }
+    }
+  },
+  {
+    "event": "step",
+    "data": {
+      "run_id": "run_fixture_first_1",
+      "step": {
+        "i": 2,
+        "t": 1.8,
+        "kind": "search",
+        "detail": "Tavily company news November 2026",
+        "model": null,
+        "phase": "search",
+        "tokens": 0,
+        "cost_usd": 0
+      }
+    }
+  },
+  {
+    "event": "step",
+    "data": {
+      "run_id": "run_fixture_first_2",
+      "step": {
+        "i": 2,
+        "t": 1.8,
+        "kind": "search",
+        "detail": "Tavily company news November 2026",
+        "model": null,
+        "phase": "search",
+        "tokens": 0,
+        "cost_usd": 0
+      }
+    }
+  },
+  {
+    "event": "step",
+    "data": {
+      "run_id": "run_fixture_first_3",
+      "step": {
+        "i": 2,
+        "t": 1.8,
+        "kind": "search",
+        "detail": "Tavily company news November 2026",
+        "model": null,
+        "phase": "search",
+        "tokens": 0,
+        "cost_usd": 0
+      }
+    }
+  },
+  {
+    "event": "step",
+    "data": {
+      "run_id": "run_fixture_baseline_1",
+      "step": {
+        "i": 3,
+        "t": 2.7,
+        "kind": "read",
+        "detail": "https://example.com/pool/tavily-about",
+        "model": null,
+        "phase": "search",
+        "tokens": 0,
+        "cost_usd": 0
+      }
+    }
+  },
+  {
+    "event": "step",
+    "data": {
+      "run_id": "run_fixture_baseline_2",
+      "step": {
+        "i": 3,
+        "t": 2.7,
+        "kind": "read",
+        "detail": "https://example.com/pool/tavily-about",
+        "model": null,
+        "phase": "search",
+        "tokens": 0,
+        "cost_usd": 0
+      }
+    }
+  },
+  {
+    "event": "step",
+    "data": {
+      "run_id": "run_fixture_baseline_3",
+      "step": {
+        "i": 3,
+        "t": 2.7,
+        "kind": "read",
+        "detail": "https://example.com/pool/tavily-about",
+        "model": null,
+        "phase": "search",
+        "tokens": 0,
+        "cost_usd": 0
+      }
+    }
+  },
+  {
+    "event": "step",
+    "data": {
+      "run_id": "run_fixture_first_1",
+      "step": {
+        "i": 3,
+        "t": 2.7,
+        "kind": "read",
+        "detail": "https://example.com/pool/tavily-about",
+        "model": null,
+        "phase": "search",
+        "tokens": 0,
+        "cost_usd": 0
+      }
+    }
+  },
+  {
+    "event": "step",
+    "data": {
+      "run_id": "run_fixture_first_2",
+      "step": {
+        "i": 3,
+        "t": 2.7,
+        "kind": "read",
+        "detail": "https://example.com/pool/tavily-about",
+        "model": null,
+        "phase": "search",
+        "tokens": 0,
+        "cost_usd": 0
+      }
+    }
+  },
+  {
+    "event": "step",
+    "data": {
+      "run_id": "run_fixture_first_3",
+      "step": {
+        "i": 3,
+        "t": 2.7,
+        "kind": "read",
+        "detail": "https://example.com/pool/tavily-about",
+        "model": null,
+        "phase": "search",
+        "tokens": 0,
+        "cost_usd": 0
+      }
+    }
+  },
+  {
+    "event": "step",
+    "data": {
+      "run_id": "run_fixture_baseline_1",
+      "step": {
+        "i": 4,
+        "t": 9.4,
+        "kind": "llm",
+        "detail": "write briefing",
+        "model": "qwen3.8-27b",
+        "phase": "write",
+        "tokens": 3100,
+        "cost_usd": 0.0009
+      }
+    }
+  },
+  {
+    "event": "step",
+    "data": {
+      "run_id": "run_fixture_baseline_2",
+      "step": {
+        "i": 4,
+        "t": 9.4,
+        "kind": "llm",
+        "detail": "write briefing",
+        "model": "qwen3.8-27b",
+        "phase": "write",
+        "tokens": 3100,
+        "cost_usd": 0.0009
+      }
+    }
+  },
+  {
+    "event": "step",
+    "data": {
+      "run_id": "run_fixture_baseline_3",
+      "step": {
+        "i": 4,
+        "t": 6.0,
+        "kind": "error",
+        "detail": "model call failed: 503 after retries",
+        "model": "qwen3.8-27b",
+        "phase": "write",
+        "tokens": 0,
+        "cost_usd": 0
+      }
+    }
+  },
+  {
+    "event": "step",
+    "data": {
+      "run_id": "run_fixture_first_1",
+      "step": {
+        "i": 4,
+        "t": 9.4,
+        "kind": "llm",
+        "detail": "write briefing",
+        "model": "qwen3.8-27b",
+        "phase": "write",
+        "tokens": 3100,
+        "cost_usd": 0.0009
+      }
+    }
+  },
+  {
+    "event": "step",
+    "data": {
+      "run_id": "run_fixture_first_2",
+      "step": {
+        "i": 4,
+        "t": 9.4,
+        "kind": "llm",
+        "detail": "write briefing",
+        "model": "qwen3.8-27b",
+        "phase": "write",
+        "tokens": 3100,
+        "cost_usd": 0.0009
+      }
+    }
+  },
+  {
+    "event": "step",
+    "data": {
+      "run_id": "run_fixture_first_3",
+      "step": {
+        "i": 4,
+        "t": 9.4,
+        "kind": "llm",
+        "detail": "write briefing",
+        "model": "qwen3.8-27b",
+        "phase": "write",
+        "tokens": 3100,
+        "cost_usd": 0.0009
+      }
+    }
+  },
+  {
+    "event": "run_done",
+    "data": {
+      "run_id": "run_fixture_baseline_1",
+      "status": "done",
+      "duration_s": 11.1,
+      "metrics": {
+        "success": true,
+        "steps": 4,
+        "tool_calls": 2,
+        "tokens": 3480,
+        "cost_usd": 0.00094,
+        "cost_by_model": {
+          "qwen3.8-27b": 0.00094
+        },
+        "switched": false,
+        "trap_fell": false,
+        "abstention": null,
+        "claims_supported_pct": 0.92
+      }
+    }
+  },
+  {
+    "event": "run_done",
+    "data": {
+      "run_id": "run_fixture_baseline_2",
+      "status": "done",
+      "duration_s": 12.1,
+      "metrics": {
+        "success": false,
+        "steps": 4,
+        "tool_calls": 2,
+        "tokens": 3480,
+        "cost_usd": 0.00094,
+        "cost_by_model": {
+          "qwen3.8-27b": 0.00094
+        },
+        "switched": false,
+        "trap_fell": false,
+        "abstention": null,
+        "claims_supported_pct": 0.64
+      }
+    }
+  },
+  {
+    "event": "run_done",
+    "data": {
+      "run_id": "run_fixture_baseline_3",
+      "status": "error",
+      "duration_s": 6.0,
+      "metrics": {
+        "success": false,
+        "steps": 4,
+        "tool_calls": 2,
+        "tokens": 380,
+        "cost_usd": 4e-05,
+        "cost_by_model": {
+          "qwen3.8-27b": 4e-05
+        },
+        "switched": false,
+        "trap_fell": false,
+        "abstention": null,
+        "claims_supported_pct": null
+      }
+    }
+  },
+  {
+    "event": "run_done",
+    "data": {
+      "run_id": "run_fixture_first_1",
+      "status": "done",
+      "duration_s": 11.1,
+      "metrics": {
+        "success": true,
+        "steps": 4,
+        "tool_calls": 2,
+        "tokens": 3480,
+        "cost_usd": 0.00094,
+        "cost_by_model": {
+          "gemma-4-26b-a4b-it": 4e-05,
+          "qwen3.8-27b": 0.0009
+        },
+        "switched": true,
+        "trap_fell": false,
+        "abstention": null,
+        "claims_supported_pct": 0.92
+      }
+    }
+  },
+  {
+    "event": "run_done",
+    "data": {
+      "run_id": "run_fixture_first_2",
+      "status": "done",
+      "duration_s": 12.1,
+      "metrics": {
+        "success": true,
+        "steps": 4,
+        "tool_calls": 2,
+        "tokens": 3480,
+        "cost_usd": 0.00094,
+        "cost_by_model": {
+          "gemma-4-26b-a4b-it": 4e-05,
+          "qwen3.8-27b": 0.0009
+        },
+        "switched": true,
+        "trap_fell": false,
+        "abstention": null,
+        "claims_supported_pct": 0.92
+      }
+    }
+  },
+  {
+    "event": "run_done",
+    "data": {
+      "run_id": "run_fixture_first_3",
+      "status": "done",
+      "duration_s": 13.1,
+      "metrics": {
+        "success": true,
+        "steps": 4,
+        "tool_calls": 2,
+        "tokens": 3480,
+        "cost_usd": 0.00094,
+        "cost_by_model": {
+          "gemma-4-26b-a4b-it": 4e-05,
+          "qwen3.8-27b": 0.0009
+        },
+        "switched": true,
+        "trap_fell": false,
+        "abstention": null,
+        "claims_supported_pct": 0.92
+      }
+    }
+  },
+  {
+    "event": "batch_done",
+    "data": {
+      "batch_id": "b_fixture"
+    }
+  }
+]
