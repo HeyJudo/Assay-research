@@ -63,9 +63,9 @@ def test_env_routing_and_allowlist(tmp_path, monkeypatch):
     assert env["OPENAI_API_KEY"] == "k"
     proxy = f"http://{rec.id}:none@p:1"
     assert env["HTTPS_PROXY"] == env["HTTP_PROXY"] == proxy
-    assert env["NO_PROXY"] == "localhost,127.0.0.1"
+    assert env["NO_PROXY"] == "localhost,127.0.0.1,b"  # Bifrost's host skips the proxy (Docker names it "bifrost")
     if os.name != "nt":  # Windows env names are case-insensitive, so the lowercase twins are invisible there
-        assert env["https_proxy"] == env["http_proxy"] == proxy and env["no_proxy"] == "localhost,127.0.0.1"
+        assert env["https_proxy"] == env["http_proxy"] == proxy and env["no_proxy"] == "localhost,127.0.0.1,b"
     assert env["SSL_CERT_FILE"] == "/ca.pem"
     assert env["REQUESTS_CA_BUNDLE"] == "/ca.pem"
     assert env["TAVILY_API_KEY"] == ""
@@ -301,3 +301,40 @@ def test_bad_trap_rejected_early(tmp_path):
     with pytest.raises(ValueError):
         runner.run_once(agent, TASK, **CFG, trap="nope", https_proxy="http://p:1")
     assert not marker.exists()
+
+
+def test_on_start_gets_running_record_first(tmp_path):
+    marker = tmp_path / "agent_ran"
+    agent = make_agent(tmp_path, f"open({str(marker)!r},'w').write('x')\nopen(os.environ['ASSAY_OUTPUT'],'w').write('ok')\n")
+    seen = []
+    rec = runner.run_once(agent, TASK, **CFG, batch_id="b_x", repeat=2,
+                          on_start=lambda r: seen.append((r, marker.exists())))
+    [(first, agent_had_run)] = seen
+    assert not agent_had_run
+    assert first.status == "running" and first.duration_s is None
+    assert (first.id, first.batch_id, first.repeat, first.started_at) == (rec.id, "b_x", 2, rec.started_at)
+    assert rec.status == "done"
+
+
+# Bifrost's 402 body (docs/features/governance/virtual-keys.mdx), as the OpenAI SDK prints it on a crash.
+BIFROST_402 = ("openai.APIStatusError: Error code: 402 - {'type': 'budget_exceeded', 'status_code': 402, "
+               "'error': {'message': 'Budget exceeded: virtual_key vk-run-1 budget exceeded: 0.5000 >= 0.5000 dollars'}}")
+
+
+def test_bifrost_budget_refusal_is_budget_exceeded(tmp_path):
+    agent = make_agent(tmp_path, f"sys.stderr.write({BIFROST_402!r})\nsys.exit(1)\n")
+    rec = runner.run_once(agent, TASK, **CFG)
+    assert rec.status == "budget_exceeded"
+    assert "402" in rec.steps[0].detail
+
+
+def test_budget_refusal_counts_even_with_output(tmp_path):
+    agent = make_agent(tmp_path, f"sys.stderr.write({BIFROST_402!r})\nopen(os.environ['ASSAY_OUTPUT'],'w').write('partial')\n")
+    rec = runner.run_once(agent, TASK, **CFG)
+    assert rec.status == "budget_exceeded"
+    assert rec.output.text == "partial"
+
+
+def test_plain_crash_is_error(tmp_path):
+    agent = make_agent(tmp_path, "sys.stderr.write('Error code: 429 - rate limited')\nsys.exit(1)\n")
+    assert runner.run_once(agent, TASK, **CFG).status == "error"

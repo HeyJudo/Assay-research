@@ -23,6 +23,8 @@ PROXY_TRAPS = {"fake_article", "hidden_instruction", "search_outage"}
 # Allowlist, not os.environ: the parent holds the real judge and provider keys.
 OS_BASICS = ["PATH", "SYSTEMROOT", "COMSPEC", "PATHEXT", "TEMP", "TMP", "HOME", "USERPROFILE", "LANG", "LC_ALL"]
 
+# Bifrost answers 402 {"type": "budget_exceeded"} once a run-slot virtual key's budget is spent.
+BUDGET_RE = re.compile(r"budget[_ ]exceeded", re.I)
 KEY_RE = re.compile(r"(?<![A-Za-z0-9])(?:sk-bf-|sk-|tvly-|gsk_|AIza|csk-)[A-Za-z0-9_\-]+")
 
 
@@ -40,7 +42,8 @@ def run_once(agent_dir: Path, task: Task, *, agent_version: str, models: list[st
              openai_base_url=None, openai_api_key=None,
              https_proxy=None, ca_cert=None, timeout_s: float = 600, batch_id: str | None = None,
              repeat: int = 1, trap=None, trap_seed=None, pool_version="v1",
-             llm_outage_url=None) -> RunRecord:
+             llm_outage_url=None, on_start=None) -> RunRecord:
+    """on_start(record) is called with the `running` record just before the agent starts."""
     if not (agent_version and models and prompt_hash) or not all(m.strip() for m in models):
         raise ValueError("agent_version, models and prompt_hash are required")
     if trap is not None and trap not in get_args(Trap):
@@ -75,9 +78,28 @@ def run_once(agent_dir: Path, task: Task, *, agent_version: str, models: list[st
         # Lowercase too: curl only reads lowercase http_proxy.
         for k in ("HTTPS_PROXY", "HTTP_PROXY", "https_proxy", "http_proxy"):
             env[k] = proxy
-        env["NO_PROXY"] = env["no_proxy"] = "localhost,127.0.0.1"
+        # Bifrost's host skips the proxy too: in Docker it is "bifrost", not localhost.
+        local = ["localhost", "127.0.0.1", urlsplit(openai_base_url or "").hostname]
+        env["NO_PROXY"] = env["no_proxy"] = ",".join(dict.fromkeys(h for h in local if h))
 
-    text, error = "", None
+    base = RunRecord(
+        id=rid, batch_id=batch_id or f"b_{uuid.uuid4().hex[:12]}",
+        agent_id=agent_dir.name, task_id=task.id, task_type=task.type, trap=trap, repeat=repeat,
+        status="running", started_at=started.strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z", duration_s=None,
+        config=RunConfig(agent_version=agent_version, models=models, prompt_hash=prompt_hash, pool_version=pool_version,
+                         trap_seed=trap_seed, fallback_used=False),
+        # ponytail: the grader decides abstained.
+        output=RunOutput(text="", abstained=False),
+        # ponytail: steps come from proxy+Bifrost logs and claims from the judge, in later tasks.
+        steps=[], claims=[],
+        # ponytail: graders fill metrics.
+        metrics=RunMetrics(success=False, steps=0, tool_calls=0, tokens=0, cost_usd=0,
+                           cost_by_model={}, switched=False, trap_fell=False,
+                           abstention=None, claims_supported_pct=None))
+    if on_start:
+        on_start(base)
+
+    text, error, budget = "", None, False
     t0 = time.monotonic()
     with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
         out = Path(tmp) / "output.md"
@@ -104,8 +126,10 @@ def run_once(agent_dir: Path, task: Task, *, agent_version: str, models: list[st
                             pass
                     if p.poll() is None:
                         p.wait(timeout=10)
+            stderr = (Path(tmp) / "stderr").read_text(encoding="utf-8", errors="replace")
+            # ponytail: stderr match, misses an agent that swallows the 402 silently
+            budget = bool(BUDGET_RE.search(stderr))
             if p.returncode != 0:
-                stderr = (Path(tmp) / "stderr").read_text(encoding="utf-8", errors="replace")
                 if openai_api_key:
                     stderr = stderr.replace(openai_api_key, "[redacted]")
                 error = f"exit {p.returncode}: {KEY_RE.sub('[redacted]', stderr)[-500:]}"
@@ -121,21 +145,9 @@ def run_once(agent_dir: Path, task: Task, *, agent_version: str, models: list[st
 
     steps = [Step(i=1, t=duration, kind="error", detail=error, model=None, phase="write",
                   tokens=0, cost_usd=0)] if error else []
-    return RunRecord(
-        id=rid, batch_id=batch_id or f"b_{uuid.uuid4().hex[:12]}",
-        agent_id=agent_dir.name, task_id=task.id, task_type=task.type, trap=trap, repeat=repeat,
-        status="error" if error else "done",
-        started_at=started.strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z", duration_s=duration,
-        config=RunConfig(agent_version=agent_version, models=models, prompt_hash=prompt_hash, pool_version=pool_version,
-                         trap_seed=trap_seed, fallback_used=False),
-        # ponytail: the grader decides abstained.
-        output=RunOutput(text=text, abstained=False),
-        # ponytail: steps come from proxy+Bifrost logs and claims from the judge, in later tasks.
-        steps=steps, claims=[],
-        # ponytail: graders fill metrics.
-        metrics=RunMetrics(success=False, steps=0, tool_calls=0, tokens=0, cost_usd=0,
-                           cost_by_model={}, switched=False, trap_fell=False,
-                           abstention=None, claims_supported_pct=None))
+    status = "budget_exceeded" if budget else "error" if error else "done"
+    return base.model_copy(update=dict(status=status, duration_s=duration, output=RunOutput(text=text, abstained=False),
+                                       steps=steps))
 
 
 if __name__ == "__main__":
