@@ -1,0 +1,9 @@
+{
+  "id": "fact-hinton-university",
+  "type": "fact",
+  "prompt": "In what year did the university where Geoffrey Hinton earned his PhD receive its royal charter?",
+  "as_of_date": "2026-11-13",
+  "answer": "1582",
+  "trap_twin": "fact-hinton-university-trap",
+  "notes": "Hops: Hinton -> PhD at the University of Edinburgh -> royal charter 1582. Asks for the charter, not 'founded': the pool also dates the opening to 1583. Answer checked in-pool by the builder. Needs a second person's check (PRD §9)."
+}

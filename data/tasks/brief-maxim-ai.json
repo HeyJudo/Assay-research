@@ -1,0 +1,9 @@
+{
+  "id": "brief-maxim-ai",
+  "type": "briefing",
+  "prompt": "Brief me on Maxim AI for a meeting on 2026-11-13.",
+  "as_of_date": "2026-11-13",
+  "answer": null,
+  "trap_twin": "brief-maxim-ai-trap",
+  "notes": "Sponsor briefing. Pool built on as_of_date."
+}

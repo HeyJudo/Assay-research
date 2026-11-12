@@ -1,0 +1,9 @@
+{
+  "id": "fact-pytorch-company-founded",
+  "type": "fact",
+  "prompt": "In what year was the company that owns the lab where PyTorch was originally developed founded?",
+  "as_of_date": "2026-11-13",
+  "answer": "2004",
+  "trap_twin": null,
+  "notes": "Hops: PyTorch -> Facebook AI Research -> Facebook (now Meta) -> founded 2004. 'Company that owns the lab' rules out FAIR's own 2013 start. Answer checked in-pool by the builder. Needs a second person's check (PRD §9)."
+}

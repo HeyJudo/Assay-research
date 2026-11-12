@@ -1,0 +1,9 @@
+{
+  "id": "brief-tavily",
+  "type": "briefing",
+  "prompt": "Brief me on Tavily for a meeting on 2026-11-13.",
+  "as_of_date": "2026-11-13",
+  "answer": null,
+  "trap_twin": null,
+  "notes": "Sponsor briefing. Pool built on as_of_date."
+}

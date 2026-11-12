@@ -1,0 +1,9 @@
+{
+  "id": "fact-h100-ceo-birth-year",
+  "type": "fact",
+  "prompt": "In what year was the co-founder and CEO of the company that makes the H100 GPU born?",
+  "as_of_date": "2026-11-13",
+  "answer": "1963",
+  "trap_twin": null,
+  "notes": "Hops: H100 -> Nvidia -> Jensen Huang -> born 1963. Birth year, not city: pool sources disagree on the city (Taipei vs Tainan). Answer checked in-pool by the builder. Needs a second person's check (PRD §9)."
+}
