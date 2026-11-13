@@ -1,14 +1,18 @@
+import { connectBatchStream } from './batch-stream'
+import { registerAgents, agentLabel } from './agent-names'
 import { agents, leaderboard, runs, tasks } from '@/fixtures'
 import type { Agent, BatchEvent, BatchRequest, LeaderboardRow, RunRecord, RunSummary, Task } from '@/types'
 
 /** Explicit opt-in. API failures never silently turn into fixture results. */
 export const apiMode = import.meta.env.VITE_DATA_MODE === 'api'
+export const sampleData = !apiMode || import.meta.env.VITE_RESULTS_ARE_FIXTURES !== 'false'
+registerAgents(agents)
 const base = (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/$/, '')
 const savedRuns = new Map<string, RunRecord>()
 const simulatedBatches = new Map<string, RunRecord[]>()
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
-  const response = await fetch(`${base}/api${path}`, { ...options, headers: { 'Content-Type': 'application/json', ...options?.headers } })
+  const response = await fetch(`${base}/api${path}`, { ...options, headers: { ...(options?.body ? { 'Content-Type': 'application/json' } : {}), ...options?.headers } })
   if (!response.ok) {
     let message = `Request failed (${response.status})`
     try { const payload = await response.json(); message = typeof payload.detail === 'string' ? payload.detail : message } catch { /* retain HTTP status */ }
@@ -18,7 +22,7 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
 }
 
 export const data = {
-  agents: () => apiMode ? request<Agent[]>('/agents') : Promise.resolve(agents),
+  agents: async () => { const list = apiMode ? await request<Agent[]>('/agents') : agents; registerAgents(list); return list },
   tasks: () => apiMode ? request<Task[]>('/tasks') : Promise.resolve(tasks),
   leaderboard: () => apiMode ? request<LeaderboardRow[]>('/leaderboard') : Promise.resolve(leaderboard),
   runs: async (batch?: string): Promise<RunSummary[]> => apiMode ? request(`/runs${batch ? `?batch_id=${encodeURIComponent(batch)}` : ''}`) : [...savedRuns.values(), ...runs].filter(r => !batch || r.batch_id === batch),
@@ -34,8 +38,8 @@ export const data = {
     const task = tasks.find(t => t.id === config.task_id)!
     const records = config.agents.flatMap((agent, index) => [1, 2, 3].map(repeat => {
       const template = structuredClone(runs[0])
-      const passed = task.type === 'unanswerable' || !config.trap || agent === 'briefing-evidence-gated' || repeat !== 2
-      const synthetic = `${agentLabelForDemo(agent)} · ${task.prompt}`
+      const passed = repeat !== 2
+      const synthetic = `${agentLabel(agent)} · ${task.prompt}`
       const cheap = agent === 'briefing-cheap-first'
       const totalCost = .001 + index * .0009 + repeat * .0001
       const demoSteps = template.steps.slice(0, cheap ? 11 : 7).map((step, i) => ({
@@ -71,13 +75,7 @@ export const data = {
   },
   subscribe: (id: string, receive: (event: BatchEvent) => void, fail: (message: string) => void): (() => void) => {
     if (apiMode) {
-      const source = new EventSource(`${base}/api/batches/${encodeURIComponent(id)}/stream`)
-      for (const name of ['run_started', 'step', 'run_done', 'batch_done'] as const) source.addEventListener(name, e => {
-        try { receive({ event: name, data: JSON.parse(e.data) } as BatchEvent); if (name === 'batch_done') source.close() }
-        catch { fail('An invalid stream event was received.'); source.close() }
-      })
-      source.onerror = () => { fail('The progress connection was interrupted. Completed records remain on the server.'); source.close() }
-      return () => source.close()
+      return connectBatchStream(`${base}/api/batches/${encodeURIComponent(id)}/stream`, receive, fail)
     }
     const records = simulatedBatches.get(id) ?? []
     const events: BatchEvent[] = records.map(r => ({ event: 'run_started', data: { run_id: r.id, batch_id: id, agent_id: r.agent_id, repeat: r.repeat, started_at: r.started_at } }))
@@ -107,4 +105,3 @@ export const data = {
     return { run_id: record.id }
   },
 }
-function agentLabelForDemo(id: string) { return agents.find(a => a.id === id)?.name ?? id }

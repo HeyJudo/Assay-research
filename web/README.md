@@ -26,3 +26,11 @@ The aggregate contract supplies no spread or judge-validation statistics. The UI
 ## Checks
 
 `npm run build` verifies types and production compilation. `node --test tests/metrics.test.mjs` checks priority re-ranking, empty weights, no-success cost, repeat reliability, and missing-denominator behavior (Node 24+ for TypeScript stripping).
+
+## PR review corrections
+
+Results provenance is explicit: `VITE_RESULTS_ARE_FIXTURES` defaults to true, including API mode because the current leaderboard endpoint still serves fixtures. Set it to `false` only when the server supplies measured aggregates. Simulated batches are always labeled independently of that setting. Agent names come from `/api/agents`.
+
+The startup splash and duplicate sidebar launch control were removed. Sidebar navigation scrolls at constrained heights; phone navigation exposes all five short labels. Colors live in the canonical shadcn variables in `index.css`; both stylesheets use those tokens. Button and Card were installed from the shadcn registry.
+
+Run `npm test` for metric and EventSource reconnection tests. Backend variance and judge-agreement fields remain a lead decision and are not invented here.
