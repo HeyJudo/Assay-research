@@ -28,6 +28,7 @@ def sentinel():
     class H(BaseHTTPRequestHandler):
         def do_GET(self):
             srv.gets.append((self.path, self.headers.get("X-Bifrost-Setup-Token")))
+            srv.auths.append(self.headers.get("Authorization"))
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
             self.end_headers()
@@ -45,7 +46,7 @@ def sentinel():
             pass
 
     srv = ThreadingHTTPServer(("127.0.0.1", 0), H)
-    srv.gets, srv.logs = [], (BACKEND / "tests" / "fixtures" / "bifrost_logs.json").read_bytes()
+    srv.gets, srv.auths, srv.logs = [], [], (BACKEND / "tests" / "fixtures" / "bifrost_logs.json").read_bytes()
     threading.Thread(target=srv.serve_forever, daemon=True).start()
     return srv, hits
 

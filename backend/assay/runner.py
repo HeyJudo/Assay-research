@@ -1,6 +1,7 @@
 """Runs one agent on one task (PRD §8 agent contract) and returns a RunRecord. start_batch runs a batch in parallel."""
 
 import argparse
+import base64
 import json
 import os
 import re
@@ -227,9 +228,12 @@ def fetch_usage(bifrost_url: str, vk_id: str, since: str) -> list[dict]:
     time.sleep(BIFROST_LOG_DELAY_S)
     u = urlsplit(bifrost_url)
     q = urlencode(dict(virtual_key_ids=vk_id, start_time=since, sort_by="timestamp", order="asc", limit=1000))
-    # ponytail: the setup token works only while Bifrost has no dashboard admin, with an admin it needs Basic auth.
-    req = Request(f"{u.scheme}://{u.netloc}/api/logs?{q}",
-                  headers={"X-Bifrost-Setup-Token": os.environ.get("BIFROST_SETUP_TOKEN", "")})
+    # Bifrost takes the setup token until a dashboard admin exists, then only the admin login (Basic auth).
+    headers = {"X-Bifrost-Setup-Token": os.environ.get("BIFROST_SETUP_TOKEN", "")}
+    user, password = os.environ.get("BIFROST_ADMIN_USER"), os.environ.get("BIFROST_ADMIN_PASSWORD")
+    if user and password:
+        headers["Authorization"] = "Basic " + base64.b64encode(f"{user}:{password}".encode()).decode()
+    req = Request(f"{u.scheme}://{u.netloc}/api/logs?{q}", headers=headers)
     with urlopen(req, timeout=30) as r:
         rows = json.load(r)["logs"]
     return [{"model": row.get("alias") or row["model"], "input_tokens": t["prompt_tokens"],

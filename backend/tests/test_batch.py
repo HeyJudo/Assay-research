@@ -46,6 +46,8 @@ def env(tmp_path, monkeypatch):
     agent(tmp_path / "agents", "a")
     agent(tmp_path / "agents", "b")
     monkeypatch.setattr(runner, "BIFROST_LOG_DELAY_S", 0)
+    for k in ("BIFROST_ADMIN_USER", "BIFROST_ADMIN_PASSWORD"):
+        monkeypatch.delenv(k, raising=False)
     srv, hits = to.sentinel()
     yield srv, hits
     srv.shutdown()
@@ -188,6 +190,18 @@ def test_done_fact_run_is_graded_from_bifrost_usage(env, monkeypatch):
     assert {q["virtual_key_ids"][0]: q["start_time"][0] for q in queries} == \
            {f"vk-run-{r.repeat}": r.started_at for r in recs}
     assert {t for _, t in srv.gets} == {"tok-123"}
+    assert srv.auths == [None] * 3  # no admin login set: setup token only
+
+
+def test_usage_read_with_admin_login_when_set(env, monkeypatch):
+    # A Bifrost with a dashboard admin refuses the setup token and wants Basic auth.
+    srv, _ = env
+    monkeypatch.setenv("BIFROST_ADMIN_USER", "admin")
+    monkeypatch.setenv("BIFROST_ADMIN_PASSWORD", "pw")
+    agent(runner.AGENTS_DIR, "w", writer("2008"))
+    run(["w"], None, srv, ["k1", "k2", "k3"])
+    assert srv.auths == ["Basic YWRtaW46cHc="] * 3  # base64("admin:pw")
+    assert {r.status for r in store.list_runs(batch_id="b_test")} == {"done"}
 
 
 def test_briefing_run_claims_come_from_the_judge(env):
