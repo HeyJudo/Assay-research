@@ -1,0 +1,34 @@
+#!/usr/bin/env python3
+"""GPT Researcher through Assay, with env vars only (PRD §8 agent contract).
+
+Search: the runner sets HTTPS_PROXY and the CA bundle. GPT Researcher's Tavily retriever and page scraper use
+`requests`, which honors both, so the search proxy answers api.tavily.com and serves the pool pages.
+LLM: the runner sets OPENAI_BASE_URL (Bifrost) and OPENAI_API_KEY (the run's virtual key). GPT Researcher's
+OpenAI provider reads both. No GPT Researcher code is patched.
+"""
+import asyncio
+import json
+import os
+from pathlib import Path
+
+model = json.loads((Path(__file__).parent / "agent.json").read_text(encoding="utf-8"))["models"][0]
+for k, v in {"RETRIEVER": "tavily", "FAST_LLM": f"openai:{model}", "SMART_LLM": f"openai:{model}",
+             "STRATEGIC_LLM": f"openai:{model}"}.items():
+    os.environ[k] = v
+# GPT Researcher resolves each page's host locally before fetching, and pool hosts do not resolve. The proxy serves
+# only pool URLs and 404s the rest, so skipping that check opens nothing.
+os.environ["ALLOW_PRIVATE_URLS"] = "true"
+# The runner blanks TAVILY_API_KEY (the proxy doesn't check it). GPT Researcher wants one, any value will do.
+os.environ["TAVILY_API_KEY"] = os.environ.get("TAVILY_API_KEY") or "assay-proxy"
+
+from gpt_researcher import GPTResearcher  # after the env: GPT Researcher reads its config at import and init
+
+
+async def main():
+    r = GPTResearcher(query=f"{os.environ['ASSAY_TASK']}\n\nAnswer as of {os.environ['ASSAY_AS_OF']}.",
+                      report_type="research_report", verbose=False)
+    await r.conduct_research()
+    Path(os.environ["ASSAY_OUTPUT"]).write_text(await r.write_report(), encoding="utf-8")
+
+
+asyncio.run(main())

@@ -5,6 +5,7 @@ description = "Benchmarking platform for AI research agents"
 requires-python = ">=3.12"
 dependencies = [
     "fastapi>=0.162.2",
+    "gpt-researcher==0.17.0",
     "mitmproxy>=12.3.1",
     "uvicorn[standard]>=0.54.0",
 ]
