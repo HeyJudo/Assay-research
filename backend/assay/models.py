@@ -91,6 +91,8 @@ class Agent(BaseModel):
 class LeaderboardRow(BaseModel):
     agent_id: str
     accuracy: float | None
+    accuracy_low: float | None  # spread: min and max of accuracy computed per repeat number
+    accuracy_high: float | None
     cost_per_correct: float | None
     trap_resistance: float | None
     honesty: float | None
@@ -105,6 +107,14 @@ class Compare(BaseModel):
     scope: Literal["batch", "full"]
     a: LeaderboardRow
     b: LeaderboardRow
+
+
+class JudgeAgreement(BaseModel):
+    """GET /api/judge-agreement: claim judge vs 50 human labels (PRD §9). The endpoint returns null until it is run."""
+    agreement_pct: float
+    claims: int
+    matches: int
+    disagreements: dict[str, int]  # "human->judge": count
 
 
 class BatchRequest(BaseModel):

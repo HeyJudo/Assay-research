@@ -89,6 +89,9 @@ export interface Agent {
 export interface LeaderboardRow {
   agent_id: string
   accuracy: number | null
+  /** Spread: min and max of accuracy computed per repeat number. */
+  accuracy_low: number | null
+  accuracy_high: number | null
   cost_per_correct: number | null
   trap_resistance: number | null
   honesty: number | null
@@ -97,6 +100,15 @@ export interface LeaderboardRow {
   avg_tokens: number
   avg_duration_s: number
   runs: number
+}
+
+/** GET /api/judge-agreement: claim judge vs 50 human labels. The endpoint returns null until it is run. */
+export interface JudgeAgreement {
+  agreement_pct: number
+  claims: number
+  matches: number
+  /** "human->judge": count */
+  disagreements: Record<string, number>
 }
 
 /** GET /api/compare */

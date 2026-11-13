@@ -1,6 +1,6 @@
 [
-  { "agent_id": "briefing-evidence-gated", "accuracy": 0.78, "cost_per_correct": 0.0041, "trap_resistance": 0.92, "honesty": 0.89, "pass3": 0.56, "avg_steps": 9.4, "avg_tokens": 4800, "avg_duration_s": 51.0, "runs": 48 },
-  { "agent_id": "briefing-cheap-first", "accuracy": 0.72, "cost_per_correct": 0.0024, "trap_resistance": 0.75, "honesty": 0.67, "pass3": 0.44, "avg_steps": 10.8, "avg_tokens": 5300, "avg_duration_s": 43.5, "runs": 48 },
-  { "agent_id": "briefing-baseline", "accuracy": 0.74, "cost_per_correct": 0.0038, "trap_resistance": 0.67, "honesty": 0.56, "pass3": 0.44, "avg_steps": 8.1, "avg_tokens": 4400, "avg_duration_s": 39.2, "runs": 48 },
-  { "agent_id": "gpt-researcher", "accuracy": 0.69, "cost_per_correct": 0.0061, "trap_resistance": 0.5, "honesty": 0.44, "pass3": 0.33, "avg_steps": 14.2, "avg_tokens": 7900, "avg_duration_s": 66.7, "runs": 48 }
+  { "agent_id": "briefing-evidence-gated", "accuracy": 0.78, "accuracy_low": 0.72, "accuracy_high": 0.83, "cost_per_correct": 0.0041, "trap_resistance": 0.92, "honesty": 0.89, "pass3": 0.56, "avg_steps": 9.4, "avg_tokens": 4800, "avg_duration_s": 51.0, "runs": 48 },
+  { "agent_id": "briefing-cheap-first", "accuracy": 0.72, "accuracy_low": 0.67, "accuracy_high": 0.78, "cost_per_correct": 0.0024, "trap_resistance": 0.75, "honesty": 0.67, "pass3": 0.44, "avg_steps": 10.8, "avg_tokens": 5300, "avg_duration_s": 43.5, "runs": 48 },
+  { "agent_id": "briefing-baseline", "accuracy": 0.74, "accuracy_low": 0.69, "accuracy_high": 0.81, "cost_per_correct": 0.0038, "trap_resistance": 0.67, "honesty": 0.56, "pass3": 0.44, "avg_steps": 8.1, "avg_tokens": 4400, "avg_duration_s": 39.2, "runs": 48 },
+  { "agent_id": "gpt-researcher", "accuracy": 0.69, "accuracy_low": 0.61, "accuracy_high": 0.75, "cost_per_correct": 0.0061, "trap_resistance": 0.5, "honesty": 0.44, "pass3": 0.33, "avg_steps": 14.2, "avg_tokens": 7900, "avg_duration_s": 66.7, "runs": 48 }
 ]
