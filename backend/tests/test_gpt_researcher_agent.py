@@ -28,14 +28,14 @@ def test_agent_is_discoverable_with_lf_run():
 
 
 def test_wrapper_routes_by_env_only(tmp_path):
-    (tmp_path / "gpt_researcher.py").write_text(FAKE)
+    (tmp_path / "gpt_researcher.py").write_text(FAKE, encoding="utf-8")
     out = tmp_path / "out.md"
     env = {**os.environ, "PYTHONPATH": str(tmp_path), "ASSAY_TASK": "Q?", "ASSAY_AS_OF": "2026-01-02",
            "ASSAY_OUTPUT": str(out), "TAVILY_API_KEY": "", "OPENAI_BASE_URL": "http://bifrost/v1",
            "OPENAI_API_KEY": "sk-bf-run", "HTTPS_PROXY": "http://run:none@127.0.0.1:1"}
     subprocess.run(runner._command(AGENT / "run"), env=env, check=True)
     got = json.loads(out.read_text(encoding="utf-8"))
-    model = json.loads((AGENT / "agent.json").read_text())["models"][0]
+    model = json.loads((AGENT / "agent.json").read_text(encoding="utf-8"))["models"][0]
     assert got["query"] == "Q?\n\nAnswer as of 2026-01-02."
     assert got["env"] == {"RETRIEVER": "tavily", "FAST_LLM": f"openai:{model}", "SMART_LLM": f"openai:{model}",
                           "STRATEGIC_LLM": f"openai:{model}", "ALLOW_PRIVATE_URLS": "true",
