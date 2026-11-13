@@ -1,0 +1,4 @@
+{
+  "qwen3.8-27b": {"input_per_million": 0.80, "output_per_million": 4.00},
+  "gemma-4-26b-a4b-it": {"input_per_million": 0.013, "output_per_million": 0.038}
+}
