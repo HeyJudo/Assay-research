@@ -120,3 +120,40 @@ legend { color: var(--muted-foreground); }legend span { color: var(--secondary-f
 }
 .bottom-grid { grid-template-columns: 1fr; }
 @media(prefers-reduced-motion:reduce) { .route-enter,.route-exit { animation:none; } .route-exit { opacity:0; } }
+
+/* Coda-inspired research workspace, using the canonical shadcn theme. */
+.sidebar { background: var(--card); border-color: var(--border); width: 230px; }
+.main-shell { margin-left: 230px; }
+.brand { font-size: 32px; color: var(--foreground); }
+.brand-mark { background: var(--primary); color: var(--primary-foreground); border-color: var(--primary); box-shadow:none; }
+.brand-period { color: var(--primary); }
+.brand-edition { color: var(--muted-foreground); }
+.nav-item { color: var(--muted-foreground); font-size: 13px; border-radius: 7px; }
+.nav-item.active { background: var(--accent); color: var(--accent-foreground); border-color: var(--border); box-shadow:none; }
+.topbar { background: var(--card); }
+.mode-banner { background: var(--secondary); color: var(--secondary-foreground); border-color: var(--border); }
+.topbar strong, h1, h2, h3 { color:var(--foreground); }
+main { padding-top: 42px; gap:30px; }
+h1 { font-size:clamp(30px,3.1vw,46px); letter-spacing:-1.8px; font-weight:700; }
+.description { font-size:14px; line-height:1.7; max-width:620px; }
+[data-slot="card"] { border-radius:12px; box-shadow:none; }
+.insight-card { background:var(--card); border-color:var(--border); border-radius:10px; padding:25px; }
+.insight-card:first-child { background:var(--secondary); }
+.insight-card h3 { font-size:25px; color:var(--foreground); line-height:1.3; }
+.insight-card p, .insight-card small, .cell-note { color:var(--muted-foreground); font-size:11px; }
+.agent-name { color:var(--foreground); font-size:12px; }
+[data-slot="table-head"] { background:var(--muted); font-size:11px; }
+[data-slot="table-cell"] { font-size:12px; padding-block:19px; }
+.text-link { color:var(--primary); }
+.recommendation { background:var(--secondary); border-color:var(--border); }
+.recommendation h2, .recommendation p { color:var(--secondary-foreground); }
+.claim, .agent-option, .brief-paper { background:var(--card); }
+.agent-option.selected { background:var(--secondary); border-color:var(--primary); }
+input:not([type="range"]):not([type="checkbox"]),select { background:var(--card); color:var(--foreground); min-height:42px; }
+.compare-table td:nth-child(2) { background:var(--secondary); color:var(--secondary-foreground); }
+.soft-card { background:var(--secondary); }
+.section-label h2, [data-slot="card-header"] h2 { font-size:18px; color:var(--foreground); }
+.brief-placeholder h3, .brief-text p, .timeline p { color:var(--foreground); }
+@media(max-width:680px) { .sidebar { width:100%; }.main-shell { margin:0; }main { padding-top:28px; }h1 { font-size:32px; }.insight-card { padding:18px; }.insight-card h3 { font-size:22px; } }
+
+[data-slot="button"][data-variant="default"] { color: var(--primary-foreground); }
