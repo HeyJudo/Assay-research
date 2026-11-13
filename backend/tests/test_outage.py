@@ -21,10 +21,19 @@ def free_port():
 
 
 def sentinel():
-    """Local HTTP server standing in for Bifrost. Records request paths."""
+    """Local HTTP server standing in for Bifrost. hits = POST paths. GET /api/logs answers srv.logs
+    (bytes, swappable) and records (path, setup token) in srv.gets."""
     hits = []
 
     class H(BaseHTTPRequestHandler):
+        def do_GET(self):
+            srv.gets.append((self.path, self.headers.get("X-Bifrost-Setup-Token")))
+            srv.auths.append(self.headers.get("Authorization"))
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(srv.logs)
+
         def do_POST(self):
             hits.append(self.path)
             self.rfile.read(int(self.headers.get("Content-Length", 0)))  # an unread body resets the socket under load
@@ -37,6 +46,7 @@ def sentinel():
             pass
 
     srv = ThreadingHTTPServer(("127.0.0.1", 0), H)
+    srv.gets, srv.auths, srv.logs = [], [], (BACKEND / "tests" / "fixtures" / "bifrost_logs.json").read_bytes()
     threading.Thread(target=srv.serve_forever, daemon=True).start()
     return srv, hits
 

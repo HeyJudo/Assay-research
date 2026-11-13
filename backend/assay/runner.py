@@ -1,6 +1,7 @@
 """Runs one agent on one task (PRD §8 agent contract) and returns a RunRecord. start_batch runs a batch in parallel."""
 
 import argparse
+import base64
 import json
 import os
 import re
@@ -17,10 +18,11 @@ import uuid
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import get_args
-from urllib.parse import urlsplit, urlunsplit
+from typing import Callable, get_args
+from urllib.parse import urlencode, urlsplit, urlunsplit
+from urllib.request import Request, urlopen
 
-from assay import store
+from assay import graders, store
 from assay.models import (BatchDoneEvent, RunConfig, RunDoneEvent, RunMetrics, RunOutput, RunRecord, RunStartedEvent,
                           Step, StepEvent, Task, Trap)
 
@@ -41,6 +43,8 @@ OS_BASICS = ["PATH", "SYSTEMROOT", "COMSPEC", "PATHEXT", "TEMP", "TMP", "HOME", 
 # Bifrost answers 402 {"type": "budget_exceeded"} once a run-slot virtual key's budget is spent.
 BUDGET_RE = re.compile(r"budget[_ ]exceeded", re.I)
 KEY_RE = re.compile(r"(?<![A-Za-z0-9])(?:sk-bf-|sk-|tvly-|gsk_|AIza|csk-)[A-Za-z0-9_\-]+")
+# ponytail: measured Bifrost writes a log row ~5s after the call, fixed wait, poll if it proves flaky.
+BIFROST_LOG_DELAY_S = 7
 
 
 def _command(run: Path) -> list[str]:
@@ -219,8 +223,27 @@ def _stop(procs: list[subprocess.Popen], tmp: Path) -> None:
     shutil.rmtree(tmp, ignore_errors=True)
 
 
+def fetch_usage(bifrost_url: str, vk_id: str, since: str) -> list[dict]:
+    """Token usage of every Bifrost call made with virtual key vk_id since `since`, from Bifrost's request log."""
+    time.sleep(BIFROST_LOG_DELAY_S)
+    u = urlsplit(bifrost_url)
+    q = urlencode(dict(virtual_key_ids=vk_id, start_time=since, sort_by="timestamp", order="asc", limit=1000))
+    # Bifrost takes the setup token until a dashboard admin exists, then only the admin login (Basic auth).
+    headers = {"X-Bifrost-Setup-Token": os.environ.get("BIFROST_SETUP_TOKEN", "")}
+    user, password = os.environ.get("BIFROST_ADMIN_USER"), os.environ.get("BIFROST_ADMIN_PASSWORD")
+    if user and password:
+        headers["Authorization"] = "Basic " + base64.b64encode(f"{user}:{password}".encode()).decode()
+    req = Request(f"{u.scheme}://{u.netloc}/api/logs?{q}", headers=headers)
+    with urlopen(req, timeout=30) as r:
+        rows = json.load(r)["logs"]
+    return [{"model": row.get("alias") or row["model"], "input_tokens": t["prompt_tokens"],
+             "output_tokens": t["completion_tokens"], "cost_usd": row.get("cost") or 0}
+            for row in rows if (t := row.get("token_usage")) and t["prompt_tokens"] + t["completion_tokens"] > 0]
+
+
 def start_batch(batch_id: str, agent_ids: list[str], task: Task, trap, *, emit, bifrost_url: str,
-                vks: list[str], timeout_s: float = 600) -> threading.Thread:
+                vks: list[str], timeout_s: float = 600,
+                judge: Callable[[str], str] = graders._judge_http) -> threading.Thread:
     """Run each agent REPEATS times on task, all runs in parallel. Run slot n gets vks[n-1] as its Bifrost key.
 
     Starts the batch's search proxy (task pool + trap) and, for model_outage, the outage pass-through, then
@@ -283,6 +306,15 @@ def start_batch(batch_id: str, agent_ids: list[str], task: Task, trap, *, emit, 
             # A started run must end, or it stays `running` forever.
             rec = begun[0].model_copy(update=dict(status="error", duration_s=0.0, steps=[Step(
                 i=1, t=0, kind="error", detail=f"runner: {e!r}"[:500], model=None, phase="write", tokens=0, cost_usd=0)]))
+        if rec.status == "done":
+            try:
+                # Only one batch runs at a time and each concurrent run has its own slot: vk id + start time is the run.
+                usage = fetch_usage(bifrost_url, f"vk-run-{slot + 1}", rec.started_at)
+                rec = graders.grade_run(rec, task, pool, usage, judge)
+            except Exception as e:
+                rec = rec.model_copy(update=dict(status="error", steps=[*rec.steps, Step(
+                    i=len(rec.steps) + 1, t=rec.duration_s, kind="error", model=None, phase="check", tokens=0,
+                    cost_usd=0, detail=KEY_RE.sub("[redacted]", f"grading: {e!r}")[:500])]))
         store.save(rec)
         # ponytail: steps go out when the run ends, live steps come with the proxy+Bifrost log timeline
         for step in rec.steps:

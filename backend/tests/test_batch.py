@@ -2,6 +2,7 @@
 
 import json
 from pathlib import Path
+from urllib.parse import parse_qs, urlsplit
 
 import pytest
 import test_outage as to
@@ -44,12 +45,19 @@ def env(tmp_path, monkeypatch):
     (tmp_path / "agents").mkdir()
     agent(tmp_path / "agents", "a")
     agent(tmp_path / "agents", "b")
+    monkeypatch.setattr(runner, "BIFROST_LOG_DELAY_S", 0)
+    for k in ("BIFROST_ADMIN_USER", "BIFROST_ADMIN_PASSWORD"):
+        monkeypatch.delenv(k, raising=False)
     srv, hits = to.sentinel()
     yield srv, hits
     srv.shutdown()
 
 
-def run(agent_ids, trap, srv, vks):
+def never_judge(prompt):
+    raise AssertionError("the judge must not be called")
+
+
+def run(agent_ids, trap, srv, vks, judge=never_judge, task=None):
     events = []
 
     def emit(name, data):
@@ -57,8 +65,8 @@ def run(agent_ids, trap, srv, vks):
             assert store.get(data.run_id).status == "running"
         events.append((name, data))
 
-    t = runner.start_batch("b_test", agent_ids, runner.find_task(TASK_ID), trap, emit=emit,
-                           bifrost_url=f"http://127.0.0.1:{srv.server_port}/v1", vks=vks)
+    t = runner.start_batch("b_test", agent_ids, task or runner.find_task(TASK_ID), trap, emit=emit,
+                           bifrost_url=f"http://127.0.0.1:{srv.server_port}/v1", vks=vks, judge=judge)
     t.join(60)
     assert not t.is_alive()
     return events
@@ -113,6 +121,7 @@ def test_failed_runs_still_finish_the_batch(env):
     steps = [d for n, d in events if n == "step"]
     assert len(steps) == 3 and all(s.step.kind == "error" for s in steps)
     assert events[-1][0] == "batch_done"
+    assert srv.gets == []  # never graded, never fetched usage (never_judge would have raised)
 
 
 def test_lookups(env, tmp_path):
@@ -155,3 +164,94 @@ def test_run_that_raises_still_ends(env, monkeypatch):
     assert [d.status for d in done] == ["error"] * 3
     assert {r.status for r in store.list_runs(batch_id="b_test")} == {"error"}
     assert events[-1][0] == "batch_done"
+
+
+def writer(body):
+    return f"#!/usr/bin/env python3\nimport os\nopen(os.environ['ASSAY_OUTPUT'], 'w').write({body!r})\n"
+
+
+def test_done_fact_run_is_graded_from_bifrost_usage(env, monkeypatch):
+    srv, _ = env
+    monkeypatch.setenv("BIFROST_SETUP_TOKEN", "tok-123")
+    agent(runner.AGENTS_DIR, "w", writer("2008"))
+    events = run(["w"], None, srv, ["k1", "k2", "k3"])
+    done = [d for n, d in events if n == "run_done"]
+    recs = store.list_runs(batch_id="b_test")
+    assert len(done) == len(recs) == 3
+    for r in recs:
+        assert r.status == "done" and r.metrics.success is True
+        assert r.metrics.tokens == 17 and r.metrics.steps == 0
+        assert r.metrics.cost_usd == pytest.approx(2e-05)
+        assert r.metrics.cost_by_model == {"qwen3.8-27b": pytest.approx(2e-05)}
+    assert [d.metrics for d in sorted(done, key=lambda d: d.run_id)] == [r.metrics for r in sorted(recs, key=lambda r: r.id)]
+    # Slot n = repeat n here: each run asks for its own slot's key, from its own start.
+    queries = [parse_qs(urlsplit(p).query) for p, _ in srv.gets]
+    assert all(p.startswith("/api/logs?") for p, _ in srv.gets)
+    assert {q["virtual_key_ids"][0]: q["start_time"][0] for q in queries} == \
+           {f"vk-run-{r.repeat}": r.started_at for r in recs}
+    assert {t for _, t in srv.gets} == {"tok-123"}
+    assert srv.auths == [None] * 3  # no admin login set: setup token only
+
+
+def test_usage_read_with_admin_login_when_set(env, monkeypatch):
+    # A Bifrost with a dashboard admin refuses the setup token and wants Basic auth.
+    srv, _ = env
+    monkeypatch.setenv("BIFROST_ADMIN_USER", "admin")
+    monkeypatch.setenv("BIFROST_ADMIN_PASSWORD", "pw")
+    agent(runner.AGENTS_DIR, "w", writer("2008"))
+    run(["w"], None, srv, ["k1", "k2", "k3"])
+    assert srv.auths == ["Basic YWRtaW46cHc="] * 3  # base64("admin:pw")
+    assert {r.status for r in store.list_runs(batch_id="b_test")} == {"done"}
+
+
+def test_briefing_run_claims_come_from_the_judge(env):
+    srv, _ = env
+    pool = json.loads(runner.find_pool(TASK_ID).read_text("utf-8"))
+    doc = pool["docs"][0]
+    quote = "Python 3.13 ships an experimental free-threaded build"
+    assert quote in doc["content"]
+    agent(runner.AGENTS_DIR, "w", writer(f"Python 3.13 has an experimental free-threaded build. {doc['url']}"))
+    prompts = []
+
+    def judge(prompt):
+        prompts.append(prompt)
+        return json.dumps([{"text": "Python 3.13 ships an experimental free-threaded build.", "verdict": "supported",
+                            "source_url": doc["url"], "source_quote": quote}])
+
+    task = runner.find_task(TASK_ID).model_copy(update={"type": "briefing"})
+    run(["w"], None, srv, ["k1", "k2", "k3"], judge=judge, task=task)
+    recs = store.list_runs(batch_id="b_test")
+    assert len(recs) == 3 and len(prompts) == 3
+    assert all("experimental free-threaded build. " + doc["url"] in p for p in prompts)
+    for r in recs:
+        assert r.status == "done"
+        assert [(c.verdict, c.source_url, c.source_quote) for c in r.claims] == [("supported", doc["url"], quote)]
+        assert r.metrics.claims_supported_pct == 1.0
+
+
+def test_judge_failure_marks_runs_error(env):
+    srv, _ = env
+    pool = json.loads(runner.find_pool(TASK_ID).read_text("utf-8"))
+    agent(runner.AGENTS_DIR, "w", writer(pool["docs"][0]["url"]))
+
+    def judge(prompt):
+        raise RuntimeError("judge down")
+
+    task = runner.find_task(TASK_ID).model_copy(update={"type": "briefing"})
+    events = run(["w"], None, srv, ["k1", "k2", "k3"], judge=judge, task=task)
+    assert [d.status for n, d in events if n == "run_done"] == ["error"] * 3
+    recs = store.list_runs(batch_id="b_test")
+    assert len(recs) == 3
+    for r in recs:
+        assert r.status == "error" and r.steps[-1].kind == "error" and r.steps[-1].detail.startswith("grading:")
+        assert "judge down" in r.steps[-1].detail
+
+
+def test_run_without_usage_is_error(env):
+    srv, _ = env
+    srv.logs = b'{"logs": []}'
+    agent(runner.AGENTS_DIR, "w", writer("2008"))
+    events = run(["w"], None, srv, ["k1", "k2", "k3"])
+    assert [d.status for n, d in events if n == "run_done"] == ["error"] * 3
+    for r in store.list_runs(batch_id="b_test"):
+        assert r.status == "error" and r.steps[-1].detail.startswith("grading:")
