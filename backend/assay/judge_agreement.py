@@ -8,6 +8,8 @@ from pathlib import Path
 
 from assay.graders import judge_claims
 
+RESULT = Path(__file__).resolve().parents[2] / "data" / "judge_agreement.json"  # served by GET /api/judge-agreement
+
 
 def agreement(rows: list[dict]) -> dict:
     if len(rows) != 50:
@@ -46,7 +48,9 @@ def main() -> None:
     parser.add_argument("labels", type=Path, help="JSON array with human and judge labels")
     args = parser.parse_args()
     rows = json.loads(args.labels.read_text("utf-8"))
-    print(json.dumps(evaluate(rows) if rows and "judge" not in rows[0] else agreement(rows), indent=2))
+    result = json.dumps(evaluate(rows) if rows and "judge" not in rows[0] else agreement(rows), indent=2)
+    RESULT.write_text(result + "\n", "utf-8")
+    print(result)
 
 
 if __name__ == "__main__":

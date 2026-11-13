@@ -1,4 +1,6 @@
-"""API (PRD §8). Runs come from SQLite (seeded from fixtures when empty). Leaderboard, agents, tasks and compare still read fixtures. Batches run through runner.start_batch."""
+"""API (PRD §8). Runs come from SQLite (seeded from fixtures when empty). Leaderboard and compare aggregate benchmark runs
+(batch ids starting "bench_") and fall back to fixtures until one exists. Agents and tasks read fixtures.
+Batches run through runner.start_batch."""
 
 import asyncio
 import hmac
@@ -13,9 +15,10 @@ from pathlib import Path
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, StreamingResponse
 
-from assay import runner, store
-from assay.models import (Agent, BatchCreated, BatchRequest, BatchStatus, Compare, LeaderboardRow, RunRecord,
-                          Task)
+from assay import judge_agreement, runner, store
+from assay.leaderboard import aggregate
+from assay.models import (Agent, BatchCreated, BatchRequest, BatchStatus, Compare, JudgeAgreement,
+                          LeaderboardRow, RunRecord, Task)
 
 ROOT = Path(__file__).resolve().parents[2]
 FIXTURES = ROOT / "web" / "src" / "fixtures"  # ponytail: one copy shared with the web app
@@ -45,9 +48,28 @@ def health():
     return {"ok": True}
 
 
+BENCH_PREFIX = "bench_"  # full-benchmark batch ids; live-demo batches are "b_"
+
+
+def bench_runs() -> list[RunRecord]:
+    # ponytail: loads every record then filters, a LIKE query in store if runs reach the thousands
+    return [r for r in store.list_runs() if r.batch_id.startswith(BENCH_PREFIX)]
+
+
+def rows(runs: list[RunRecord]) -> list[LeaderboardRow]:
+    return [row for a in sorted({r.agent_id for r in runs}) if (row := aggregate(runs, a))]
+
+
 @app.get("/api/leaderboard")
 def leaderboard() -> list[LeaderboardRow]:
-    return LEADERBOARD
+    runs = bench_runs()
+    return rows(runs) if runs else LEADERBOARD
+
+
+@app.get("/api/judge-agreement")
+def judge_agreement_result() -> JudgeAgreement | None:
+    f = judge_agreement.RESULT
+    return JudgeAgreement.model_validate_json(f.read_text("utf-8")) if f.exists() else None
 
 
 @app.get("/api/agents")
@@ -75,11 +97,11 @@ def run(run_id: str) -> RunRecord:
 
 @app.get("/api/compare")
 def compare(a: str, b: str, batch_id: str | None = None) -> Compare:
-    # ponytail: fixture returns full-benchmark rows for both scopes; real batch aggregates come with the runner
-    rows = {r.agent_id: r for r in LEADERBOARD}
-    if a not in rows or b not in rows:
-        raise HTTPException(404, "agent not found")
-    return Compare(scope="batch" if batch_id else "full", a=rows[a], b=rows[b])
+    runs = store.list_runs(batch_id=batch_id) if batch_id else bench_runs()
+    table = {r.agent_id: r for r in (rows(runs) if runs or batch_id else LEADERBOARD)}
+    if a not in table or b not in table:
+        raise HTTPException(404, "agent not found in this scope")
+    return Compare(scope="batch" if batch_id else "full", a=table[a], b=table[b])
 
 
 # ponytail: in memory, a restart forgets batches (their runs stay in SQLite)
