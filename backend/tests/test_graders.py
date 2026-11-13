@@ -205,7 +205,7 @@ def test_aggregate_keeps_missing_denominators_distinct():
     assert values["accuracy"] == 2 / 3 and values["pass3"] == 0
     assert values["cost_per_correct"] == pytest.approx(.15)
     assert values["trap_resistance"] is None
-    assert LeaderboardRow.model_validate({"agent_id": "a", **values})
+    assert LeaderboardRow.model_validate({"agent_id": "a", "accuracy_low": None, "accuracy_high": None, **values})
 
 
 def test_aggregate_counts_failed_run_as_failure():
