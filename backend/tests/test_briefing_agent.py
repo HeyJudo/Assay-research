@@ -1,4 +1,5 @@
 import json
+import io
 import threading
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
@@ -91,9 +92,67 @@ def test_evidence_gate_searches_each_claim_once_and_moves_unresolved(monkeypatch
     monkeypatch.setattr(agent, "search", lambda query: searches.append(query) or SOURCES)
     monkeypatch.setattr(agent, "complete", lambda model, prompt: next(answers))
     result = agent.run("evidence-gated", "Brief me on Acme", "2026-11-13")
-    assert searches == ["Brief me on Acme", "- Fact [one](https://one.test)", "- Bad claim [two](https://two.test)"]
-    assert "- Bad claim" not in result
-    assert "1 drafted claim(s) could not be verified" in result
+    assert searches == ["Brief me on Acme", "Brief me: - Fact [one](https://one.test)",
+                        "Brief me: - Bad claim [two](https://two.test)"]
+    assert "- Could not verify: Bad claim" in result
+    assert "https://two.test" not in result
+
+
+def test_evidence_gate_accepts_fenced_json_and_bad_check_keeps_draft(monkeypatch):
+    monkeypatch.setattr(agent, "search", lambda query: SOURCES)
+    responses = iter([VALID, "```json\n[]\n```", VALID, "not json"])
+    monkeypatch.setattr(agent, "complete", lambda model, prompt: next(responses))
+    assert agent.run("evidence-gated", "Brief me on Acme", "2026-11-13") == VALID
+    assert agent.run("evidence-gated", "Brief me on Acme", "2026-11-13") == VALID
+    assert "## Not found" in agent._move_unsupported("## Verified\n- Unsupported [s](https://one.test)\n## Open questions", [
+        "- Unsupported [s](https://one.test)"])
+
+
+def test_search_requests_news_for_briefing(monkeypatch):
+    bodies = []
+    monkeypatch.setattr(agent, "_post", lambda url, body, headers=None, attempts=3: bodies.append(body) or {"results": []})
+    agent.search("Brief me on Acme")
+    agent.search("What year?")
+    assert [body["topic"] for body in bodies] == ["news", "general"]
+
+
+def test_model_request_survives_three_real_http_503s(monkeypatch):
+    calls = []
+    class Handler(BaseHTTPRequestHandler):
+        def do_POST(self):
+            self.rfile.read(int(self.headers["Content-Length"]))
+            calls.append(1)
+            body = b'{"choices":[{"message":{"content":"OK"}}]}'
+            self.send_response(503 if len(calls) <= 3 else 200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        def log_message(self, *args):
+            pass
+
+    server = HTTPServer(("127.0.0.1", 0), Handler)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    monkeypatch.setenv("OPENAI_BASE_URL", f"http://127.0.0.1:{server.server_port}/v1")
+    monkeypatch.setenv("OPENAI_API_KEY", "test")
+    try:
+        assert agent.complete(agent.MAIN_MODEL, "test") == "OK"
+        assert len(calls) == 4
+    finally:
+        server.shutdown()
+
+
+def test_post_retries_read_timeout(monkeypatch):
+    calls = []
+    def urlopen(request, timeout):
+        calls.append(1)
+        if len(calls) == 1:
+            raise TimeoutError("read timed out")
+        return io.BytesIO(b'{"results":[]}')
+    monkeypatch.setattr(agent.urllib.request, "urlopen", urlopen)
+    assert agent._post("https://example.test", {}) == {"results": []}
+    assert len(calls) == 2
 
 
 def test_fact_answer_does_not_require_briefing_sections(monkeypatch):
@@ -113,7 +172,7 @@ def test_runner_discovers_all_three_agents():
     for name in ("briefing-baseline", "briefing-cheap-first", "briefing-evidence-gated"):
         directory, metadata = runner.find_agent(name)
         assert directory.name == name
-        assert metadata["version"] == "1.0" and metadata["prompt_hash"] == "3a2a75be"
+        assert metadata["version"] == "1.0" and metadata["prompt_hash"] == agent.prompt_hash(name.removeprefix("briefing-"))
 
 
 @pytest.mark.parametrize("version", ("baseline", "cheap-first", "evidence-gated"))
@@ -143,6 +202,54 @@ def test_agent_runs_through_contract_and_frozen_proxy(tmp_path, version):
             openai_api_key="sk-bf-test", https_proxy=f"http://127.0.0.1:{port}", ca_cert=str(ca),
         )
         assert result.status == "done" and result.output.text.strip() == "2008"
+    finally:
+        process.kill()
+        process.wait()
+        proxy_out.close()
+        server.shutdown()
+
+
+def test_briefing_versions_run_over_real_http_and_frozen_proxy(tmp_path):
+    pool = tmp_path / "brief.json"
+    pool.write_text(json.dumps({"task_id": "practice-brief", "pool_version": "practice-v1", "docs": SOURCES}), encoding="utf-8")
+    responses, models = [], []
+
+    class Handler(BaseHTTPRequestHandler):
+        def do_POST(self):
+            request = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
+            models.append(request["model"])
+            body = json.dumps({"choices": [{"message": {"content": responses.pop(0)}}]}).encode()
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        def log_message(self, *args):
+            pass
+
+    server = HTTPServer(("127.0.0.1", 0), Handler)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    process, port, ca, _, proxy_out = launch(tmp_path, pool=pool)
+    task = runner.Task(id="practice-brief", type="briefing", prompt="Brief me on Acme",
+                       as_of_date="2026-11-13", answer=None, trap_twin=None, notes="")
+    try:
+        wait_up(process, port, ca, tmp_path)
+        for version, answers, expected in (
+            ("baseline", [VALID], [agent.MAIN_MODEL]),
+            ("cheap-first", ["bad", VALID], [agent.SMALL_MODEL, agent.MAIN_MODEL]),
+            ("evidence-gated", [VALID, "[]"], [agent.MAIN_MODEL, agent.MAIN_MODEL]),
+        ):
+            responses[:] = answers
+            models.clear()
+            directory, metadata = runner.find_agent(f"briefing-{version}")
+            result = runner.run_once(directory, task, agent_version=metadata["version"],
+                                     models=metadata["models"], prompt_hash=metadata["prompt_hash"],
+                                     openai_base_url=f"http://127.0.0.1:{server.server_port}/v1",
+                                     openai_api_key="sk-bf-test", https_proxy=f"http://127.0.0.1:{port}",
+                                     ca_cert=str(ca))
+            assert result.status == "done" and agent.valid_format(result.output.text)
+            assert models == expected
     finally:
         process.kill()
         process.wait()

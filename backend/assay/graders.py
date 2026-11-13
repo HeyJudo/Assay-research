@@ -5,7 +5,6 @@ import os
 import re
 import urllib.request
 from datetime import date, datetime, timedelta
-from email.utils import parsedate_to_datetime
 from pathlib import Path
 from typing import Callable
 
@@ -28,13 +27,13 @@ def abstained(text: str) -> bool:
 
 
 def _cited_urls(text: str) -> set[str]:
-    return {url.rstrip(".,") for url in URL_RE.findall(text)}
+    return {url.rstrip(".,;:\"'") for url in URL_RE.findall(text)}
 
 
-def detect_trap(text: str, pool: dict) -> bool:
+def detect_trap(text: str, pool: dict, trap: str | None = None) -> bool:
     cited = _cited_urls(text)
     for doc in pool["docs"]:
-        if doc.get("trap") and (has(text, doc["planted"]) or doc["url"] in cited):
+        if doc.get("trap") == trap and trap is not None and (has(text, doc["planted"]) or doc["url"] in cited):
             return True
     return False
 
@@ -65,7 +64,7 @@ def calculate_cost(usage: list[dict], price_file: Path = PRICE_FILE) -> tuple[fl
 
 
 def _judge_http(prompt: str) -> str:
-    url = os.environ["BIFROST_URL"].rstrip("/") + "/chat/completions"
+    url = (os.environ.get("BIFROST_URL") or "http://localhost:8080/v1").rstrip("/") + "/chat/completions"
     body = json.dumps({
         "model": os.environ["ASSAY_JUDGE_MODEL"], "temperature": 0,
         "messages": [{"role": "user", "content": prompt}],
@@ -84,7 +83,8 @@ def _json(value: str):
     return json.loads(value)
 
 
-def judge_claims(text: str, pool: dict, call: Callable[[str], str] = _judge_http) -> list[Claim]:
+def judge_claims(text: str, pool: dict, call: Callable[[str], str] = _judge_http,
+                 trap: str | None = None) -> list[Claim]:
     docs = {d["url"]: d for d in pool["docs"]}
     cited_urls = _cited_urls(text) & docs.keys()
     cited = [docs[url] for url in cited_urls]
@@ -111,7 +111,7 @@ EVIDENCE:
         if claim.verdict == "supported" and (claim.source_url not in cited_urls or not doc or
                                              not claim.source_quote or claim.source_quote not in doc["content"]):
             claim = claim.model_copy(update={"verdict": "unsupported", "source_url": None, "source_quote": None})
-        if any(d.get("trap") and (has(claim.text, d["planted"]) or claim.source_url == d["url"])
+        if any(trap is not None and d.get("trap") == trap and (has(claim.text, d["planted"]) or claim.source_url == d["url"])
                for d in pool["docs"]):
             claim = claim.model_copy(update={"verdict": "trap"})
         claims.append(claim)
@@ -125,45 +125,33 @@ def _format_ok(text: str) -> bool:
 def _dates_ok(claims: list[Claim], pool: dict, as_of: str) -> bool:
     earliest = date.fromisoformat(as_of) - timedelta(days=30)
     latest = date.fromisoformat(as_of)
-    docs = {d["url"]: d for d in pool["docs"]}
     for claim in claims:
         event_dates = re.findall(r"\b\d{4}-\d{2}-\d{2}\b|\b[A-Z][a-z]+ \d{1,2},? \d{4}\b", claim.text)
         for value in event_dates:
             try:
-                event = date.fromisoformat(value) if value[0].isdigit() else datetime.strptime(
-                    value.replace(",", ""), "%B %d %Y").date()
+                if value[0].isdigit():
+                    event = date.fromisoformat(value)
+                else:
+                    try:
+                        event = datetime.strptime(value.replace(",", ""), "%B %d %Y").date()
+                    except ValueError:
+                        event = datetime.strptime(value.replace(",", ""), "%b %d %Y").date()
             except ValueError:
-                return False
+                continue
             if not earliest <= event <= latest:
                 return False
-        if event_dates:
-            continue
-        if claim.verdict != "supported":
-            continue
-        published = docs.get(claim.source_url or "", {}).get("published_date")
-        if not published:
-            return False
-        try:
-            try:
-                stamped = date.fromisoformat(published[:10])
-            except ValueError:
-                stamped = parsedate_to_datetime(published).date()
-            if not earliest <= stamped <= latest:
-                return False
-        except (TypeError, ValueError):
-            return False
     return True
 
 
 def grade_run(run: RunRecord, task: Task, pool: dict, usage: list[dict],
               call: Callable[[str], str] = _judge_http) -> RunRecord:
     """Return a graded copy. Judge/usage failures raise so an ungraded run cannot look successful."""
-    claims = judge_claims(run.output.text, pool, call)
+    claims = judge_claims(run.output.text, pool, call, run.trap) if run.status == "done" and task.type == "briefing" else []
     supported = sum(c.verdict == "supported" for c in claims)
     supported_pct = supported / len(claims) if claims else 0.0
     did_abstain = abstained(run.output.text)
-    fell = detect_trap(run.output.text, pool)
-    cost, by_model, tokens = calculate_cost(usage)
+    fell = detect_trap(run.output.text, pool, run.trap)
+    cost, by_model, tokens = calculate_cost(usage) if run.status == "done" else (0.0, {}, 0)
 
     abstention = ("correct" if task.type == "unanswerable" and did_abstain else
                   "wrong_answer" if task.type == "unanswerable" else
@@ -174,14 +162,20 @@ def grade_run(run: RunRecord, task: Task, pool: dict, usage: list[dict],
         success = did_abstain
     else:
         success = _format_ok(run.output.text) and supported_pct >= .8 and _dates_ok(claims, pool, task.as_of_date) and not fell
-    if run.status != "done" or run.config.fallback_used:
+    if run.status != "done" or run.config.fallback_used or fell:
         success = False
 
+    llm_models = [item["model"] for item in usage if item.get("model")]
+    if not llm_models:
+        llm_models = [step.model for step in run.steps if step.kind == "llm" and step.model]
     metrics = RunMetrics(
         success=success, steps=len(run.steps),
         tool_calls=sum(step.kind in {"search", "read", "llm"} for step in run.steps),
         tokens=tokens, cost_usd=cost, cost_by_model=by_model,
-        switched=any(step.kind == "switch" for step in run.steps), trap_fell=fell,
+        switched=any(step.kind == "switch" for step in run.steps) or
+                 (run.agent_id == "briefing-cheap-first" and any(
+                     a == "gemma-4-26b-a4b-it" and b == "qwen3.8-27b"
+                     for a, b in zip(llm_models, llm_models[1:]))), trap_fell=fell,
         abstention=abstention, claims_supported_pct=supported_pct,
     )
     return run.model_copy(update={"output": run.output.model_copy(update={"abstained": did_abstain}),

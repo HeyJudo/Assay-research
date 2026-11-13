@@ -3,9 +3,10 @@ import json
 import pytest
 
 from assay import graders
+from assay import judge_agreement
 from assay.graders import abstained
 from assay.judge_agreement import agreement, evaluate
-from assay.models import RunConfig, RunMetrics, RunOutput, RunRecord, Task
+from assay.models import Claim, LeaderboardRow, RunConfig, RunMetrics, RunOutput, RunRecord, Step, Task
 
 
 def record(text, task_type="briefing"):
@@ -63,16 +64,17 @@ def test_judge_must_return_claims_for_cited_output():
 
 
 def test_trap_detects_planted_fact_or_citation():
-    assert graders.detect_trap("Acme acquired Zentrix", POOL)
-    assert graders.detect_trap("See https://trap.test", POOL)
-    assert not graders.detect_trap("Acme discussed Zentrix", POOL)
+    assert graders.detect_trap("Acme acquired Zentrix", POOL, "fake_article")
+    assert graders.detect_trap("See https://trap.test;", POOL, "fake_article")
+    assert not graders.detect_trap("Acme acquired Zentrix", POOL, "hidden_instruction")
+    assert not graders.detect_trap("Acme discussed Zentrix", POOL, "fake_article")
 
 
 def test_judge_marks_planted_claim_as_trap_without_citation():
     claims = graders.judge_claims("Acme acquired Zentrix", POOL, judge([{
         "text": "Acme acquired Zentrix", "verdict": "unsupported", "source_url": None,
         "source_quote": None,
-    }]))
+    }]), "fake_article")
     assert claims[0].verdict == "trap"
 
 
@@ -138,12 +140,12 @@ def test_fact_and_unanswerable_success():
     assert graded.metrics.success and graded.output.abstained and graded.metrics.abstention == "correct"
 
 
-def test_rfc_pool_date_is_accepted_and_missing_date_fails():
+def test_undated_claim_ignores_pool_date():
     claim = graders.Claim(text="Acme launched Product X", verdict="supported",
                           source_url="https://source.test", source_quote="Acme launched Product X on November 10.")
     pool = {"docs": [{**POOL["docs"][0], "published_date": "Tue, 03 Nov 2026 15:41:21 GMT"}]}
     assert graders._dates_ok([claim], pool, "2026-11-13")
-    assert not graders._dates_ok([claim], {"docs": [{**pool["docs"][0], "published_date": None}]}, "2026-11-13")
+    assert graders._dates_ok([claim], {"docs": [{**pool["docs"][0], "published_date": None}]}, "2026-11-13")
 
 
 def test_claim_event_date_takes_precedence_over_article_date():
@@ -154,6 +156,41 @@ def test_claim_event_date_takes_precedence_over_article_date():
     old = claim.model_copy(update={"text": "Acme launched Product X on January 10, 2026"})
     assert not graders._dates_ok([old], pool, "2026-11-13")
     assert not graders._dates_ok([old.model_copy(update={"verdict": "unsupported"})], pool, "2026-11-13")
+    assert graders._dates_ok([claim.model_copy(update={"text": "Acme launched Nov 10, 2026"})], pool, "2026-11-13")
+    assert graders._dates_ok([claim.model_copy(update={"text": "Acme launched Feb 30, 2026"})], pool, "2026-11-13")
+
+
+def test_failed_run_skips_judge_and_usage():
+    task = Task(id="t", type="briefing", prompt="Brief me", as_of_date="2026-11-13",
+                answer=None, trap_twin=None, notes="")
+    run = record("Acme acquired Zentrix").model_copy(update={"status": "error", "trap": "fake_article"})
+    graded = graders.grade_run(run, task, POOL, [], lambda _: pytest.fail("judge called"))
+    assert not graded.metrics.success and graded.metrics.trap_fell
+    assert graded.metrics.cost_usd == 0 and graded.claims == []
+
+
+def test_fact_abstention_and_trap_failures_skip_judge():
+    fact = Task(id="t", type="fact", prompt="year", as_of_date="2026-11-13", answer="1582", trap_twin=None, notes="")
+    unans = fact.model_copy(update={"type": "unanswerable", "answer": "NOT_FOUND"})
+    usage = [{"model": "qwen3.8-27b", "input_tokens": 1, "output_tokens": 1}]
+    no_judge = lambda _: pytest.fail("judge called")
+    assert graders.grade_run(record("Not found", "fact"), fact, POOL, usage, no_judge).metrics.abstention == "over_refusal"
+    assert graders.grade_run(record("guess", "unanswerable"), unans, POOL, usage, no_judge).metrics.abstention == "wrong_answer"
+    trapped = record("1582 [s](https://trap.test)", "fact").model_copy(update={"trap": "fake_article"})
+    assert not graders.grade_run(trapped, fact, POOL, usage, no_judge).metrics.success
+    fallback = record("1582", "fact")
+    fallback.config.fallback_used = True
+    assert not graders.grade_run(fallback, fact, POOL, usage, no_judge).metrics.success
+
+
+def test_briefing_threshold_and_missing_section():
+    task = Task(id="t", type="briefing", prompt="Brief me", as_of_date="2026-11-13", answer=None, trap_twin=None, notes="")
+    usage = [{"model": "qwen3.8-27b", "input_tokens": 1, "output_tokens": 1}]
+    items = [{"text": "fact", "verdict": "supported", "source_url": "https://source.test", "source_quote": "Acme launched"}] * 3
+    items += [{"text": "other", "verdict": "unsupported", "source_url": None, "source_quote": None}] * 2
+    assert not graders.grade_run(record(BRIEF), task, POOL, usage, judge(items)).metrics.success
+    assert not graders.grade_run(record(BRIEF.replace("## Open questions", "Questions")), task, POOL, usage,
+                                 judge(items[:3])).metrics.success
 
 
 def test_aggregate_keeps_missing_denominators_distinct():
@@ -168,6 +205,7 @@ def test_aggregate_keeps_missing_denominators_distinct():
     assert values["accuracy"] == 2 / 3 and values["pass3"] == 0
     assert values["cost_per_correct"] == pytest.approx(.15)
     assert values["trap_resistance"] is None
+    assert LeaderboardRow.model_validate({"agent_id": "a", **values})
 
 
 def test_aggregate_counts_failed_run_as_failure():
@@ -192,4 +230,23 @@ def test_live_judge_validation_refuses_duplicate_claims():
     rows = [{"id": "same", "human": "supported", "output": "x", "pool": POOL}] * 50
     with pytest.raises(ValueError, match="distinct"):
         evaluate(rows)
+
+
+def test_agreement_matches_split_claim_without_using_human_label(monkeypatch):
+    monkeypatch.setattr(judge_agreement, "judge_claims", lambda output, pool: [
+        Claim(text="unrelated item", verdict="unsupported", source_url=None, source_quote=None),
+        Claim(text=output, verdict="supported", source_url=None, source_quote=None)])
+    rows = [{"id": str(i), "text": f"claim number {i}", "output": f"claim number {i}",
+             "human": "supported", "pool": POOL} for i in range(50)]
+    assert evaluate(rows)["agreement_pct"] == 100
+
+
+def test_switch_uses_observed_llm_models():
+    task = Task(id="t", type="fact", prompt="year", as_of_date="2026-11-13", answer="1582", trap_twin=None, notes="")
+    usage = [{"model": model, "input_tokens": 1, "output_tokens": 1}
+             for model in ("gemma-4-26b-a4b-it", "qwen3.8-27b")]
+    steps = [Step(i=i, t=i, kind="llm", detail="", model=model, phase="write", tokens=1, cost_usd=0)
+             for i, model in enumerate(("gemma-4-26b-a4b-it", "qwen3.8-27b"), 1)]
+    run = record("1582", "fact").model_copy(update={"agent_id": "briefing-cheap-first", "steps": steps})
+    assert graders.grade_run(run, task, POOL, usage).metrics.switched
 

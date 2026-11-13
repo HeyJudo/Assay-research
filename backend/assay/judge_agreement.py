@@ -3,6 +3,7 @@
 import argparse
 import json
 from collections import Counter
+from difflib import SequenceMatcher
 from pathlib import Path
 
 from assay.graders import judge_claims
@@ -14,7 +15,7 @@ def agreement(rows: list[dict]) -> dict:
     for row in rows:
         if row.get("human") not in {"supported", "unsupported", "trap", "not_found"}:
             raise ValueError("each row needs a valid human label")
-        if row.get("judge") not in {"supported", "unsupported", "trap", "not_found"}:
+        if row.get("judge") not in {"supported", "unsupported", "trap", "not_found", "unmatched"}:
             raise ValueError("each row needs a valid judge label")
     matches = sum(row["human"] == row["judge"] for row in rows)
     disagreements = Counter((row["human"], row["judge"]) for row in rows if row["human"] != row["judge"])
@@ -31,9 +32,12 @@ def evaluate(rows: list[dict]) -> dict:
         if row.get("human") not in {"supported", "unsupported", "trap", "not_found"}:
             raise ValueError("each claim needs a human verdict")
         claims = judge_claims(row["output"], row["pool"])
-        if len(claims) != 1:
-            raise ValueError(f"claim {row['id']} produced {len(claims)} judge verdicts")
-        evaluated.append({"human": row["human"], "judge": claims[0].verdict})
+        target = row.get("text") or row["output"]
+        ranked = sorted(((SequenceMatcher(None, target.lower(), claim.text.lower()).ratio(), claim)
+                         for claim in claims), key=lambda pair: pair[0], reverse=True)
+        verdict = ranked[0][1].verdict if ranked and ranked[0][0] >= .5 and (
+            len(ranked) == 1 or ranked[0][0] > ranked[1][0]) else "unmatched"
+        evaluated.append({"human": row["human"], "judge": verdict})
     return agreement(evaluated)
 
 
