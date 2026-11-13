@@ -2,6 +2,7 @@
 
 import json
 from pathlib import Path
+from urllib.parse import parse_qs, urlsplit
 
 import pytest
 import test_outage as to
@@ -181,8 +182,11 @@ def test_done_fact_run_is_graded_from_bifrost_usage(env, monkeypatch):
         assert r.metrics.cost_usd == pytest.approx(2e-05)
         assert r.metrics.cost_by_model == {"qwen3.8-27b": pytest.approx(2e-05)}
     assert [d.metrics for d in sorted(done, key=lambda d: d.run_id)] == [r.metrics for r in sorted(recs, key=lambda r: r.id)]
-    assert sorted(p.split("virtual_key_ids=")[1].split("&")[0] for p, _ in srv.gets) == ["vk-run-1", "vk-run-2", "vk-run-3"]
-    assert all(p.startswith("/api/logs?") and "start_time=" in p for p, _ in srv.gets)
+    # Slot n = repeat n here: each run asks for its own slot's key, from its own start.
+    queries = [parse_qs(urlsplit(p).query) for p, _ in srv.gets]
+    assert all(p.startswith("/api/logs?") for p, _ in srv.gets)
+    assert {q["virtual_key_ids"][0]: q["start_time"][0] for q in queries} == \
+           {f"vk-run-{r.repeat}": r.started_at for r in recs}
     assert {t for _, t in srv.gets} == {"tok-123"}
 
 
