@@ -88,11 +88,11 @@ export interface Agent {
 
 export interface LeaderboardRow {
   agent_id: string
-  accuracy: number
-  cost_per_correct: number
-  trap_resistance: number
-  honesty: number
-  pass3: number
+  accuracy: number | null
+  cost_per_correct: number | null
+  trap_resistance: number | null
+  honesty: number | null
+  pass3: number | null
   avg_steps: number
   avg_tokens: number
   avg_duration_s: number

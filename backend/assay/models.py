@@ -90,11 +90,11 @@ class Agent(BaseModel):
 
 class LeaderboardRow(BaseModel):
     agent_id: str
-    accuracy: float
-    cost_per_correct: float
-    trap_resistance: float
-    honesty: float
-    pass3: float
+    accuracy: float | None
+    cost_per_correct: float | None
+    trap_resistance: float | None
+    honesty: float | None
+    pass3: float | None
     avg_steps: float
     avg_tokens: float
     avg_duration_s: float

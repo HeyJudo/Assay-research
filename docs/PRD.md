@@ -252,4 +252,6 @@ All 6 screens, built first against fake run records in `web/src/fixtures/` · sl
 
 **Decided (Nov 13):** task suite in `data/tasks/`: 4 fact, 5 briefing (Maxim AI, Tavily, Nebius, Mistral AI, Cohere), 3 unanswerable, 4 trapped twins (2 fact + 2 briefing; 2 fake article + 2 hidden instruction), `as_of_date` 2026-11-13 · pools built once by `pool_builder.py`, never overwritten · each trap doc carries `planted`, the string graders match as a whole word for `trap_fell`.
 
+**Lead clarification (Nov 13):** the briefing date check uses parseable dates written in claims only; undated claims pass that check. Failed runs have zero recorded cost when usage is unavailable. The claim judge runs for completed briefing tasks only.
+
 **Still open:** repo name (suggest `assay-research`).
