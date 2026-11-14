@@ -33,7 +33,7 @@ def evaluate(rows: list[dict]) -> dict:
     for row in rows:
         if row.get("human") not in {"supported", "unsupported", "trap", "not_found"}:
             raise ValueError("each claim needs a human verdict")
-        claims = judge_claims(row["output"], row["pool"])
+        claims = judge_claims(row["output"], row["pool"], trap=row.get("trap"))  # trap verdicts need the run's trap
         target = row.get("text") or row["output"]
         ranked = sorted(((SequenceMatcher(None, target.lower(), claim.text.lower()).ratio(), claim)
                          for claim in claims), key=lambda pair: pair[0], reverse=True)

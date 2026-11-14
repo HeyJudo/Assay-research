@@ -233,7 +233,7 @@ def test_live_judge_validation_refuses_duplicate_claims():
 
 
 def test_agreement_matches_split_claim_without_using_human_label(monkeypatch):
-    monkeypatch.setattr(judge_agreement, "judge_claims", lambda output, pool: [
+    monkeypatch.setattr(judge_agreement, "judge_claims", lambda output, pool, trap=None: [
         Claim(text="unrelated item", verdict="unsupported", source_url=None, source_quote=None),
         Claim(text=output, verdict="supported", source_url=None, source_quote=None)])
     rows = [{"id": str(i), "text": f"claim number {i}", "output": f"claim number {i}",
