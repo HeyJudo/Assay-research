@@ -129,7 +129,7 @@ def run_once(agent_dir: Path, task: Task, *, agent_version: str, models: list[st
                          trap_seed=trap_seed, fallback_used=False),
         # ponytail: the grader decides abstained.
         output=RunOutput(text="", abstained=False),
-        # ponytail: steps come from proxy+Bifrost logs and claims from the judge, in later tasks.
+        # start_batch adds the proxy+Bifrost timeline to steps, the judge fills claims.
         steps=[], claims=[],
         # ponytail: graders fill metrics.
         metrics=RunMetrics(success=False, steps=0, tool_calls=0, tokens=0, cost_usd=0,
@@ -255,8 +255,64 @@ def fetch_usage(bifrost_url: str, vk_id: str, since: str) -> list[dict]:
     with urlopen(req, timeout=30) as r:
         rows = json.load(r)["logs"]
     return [{"model": row.get("alias") or row["model"], "input_tokens": t["prompt_tokens"],
-             "output_tokens": t["completion_tokens"], "cost_usd": row.get("cost") or 0}
+             "output_tokens": t["completion_tokens"], "cost_usd": row.get("cost") or 0, "at": row["timestamp"]}
             for row in rows if (t := row.get("token_usage")) and t["prompt_tokens"] + t["completion_tokens"] > 0]
+
+
+def _epoch(iso: str) -> float:
+    return datetime.fromisoformat(iso).timestamp()
+
+
+def _timeline(search_log: Path, rid: str, started_at: str, usage: list[dict], extra: list[Step]) -> list[Step]:
+    """PRD §6 tracing: the run's proxy log lines + its Bifrost calls (+ extra, e.g. the runner's error step), by time."""
+    # ponytail: proxy and Bifrost clocks are assumed in sync (same host or synced Docker VM), offset Bifrost if they drift.
+    # Bifrost stamps a row when it flushes its log batch, not at the call (seen live: 3 calls, one timestamp, ~2s late),
+    # so an llm step's t is an upper bound and can land after a search that followed it. Time calls in a pass-through
+    # like outage.py if receipts need exact interleaving.
+    start, rows = _epoch(started_at), []
+
+    def at(epoch):
+        return max(0.0, epoch - start)
+
+    def norm(url):  # same as proxy.norm: how the proxy matched the URL to a pool doc
+        return url.split("#")[0].rstrip("/")
+
+    lines = search_log.read_text("utf-8").splitlines(keepends=True) if search_log.exists() else []
+    for line in lines:
+        x = json.loads(line) if line.endswith("\n") else {}  # another run's half-written last line
+        if x.get("run_id") != rid:
+            continue
+        if x["kind"] == "search":
+            rows.append((at(x["t"]), "search", x["query"] + ("" if x["status"] == 200 else f" ({x['status']})"), None, 0, 0))
+        elif x["kind"] in ("fetch", "extract"):
+            urls, served = [x["url"]] if x["kind"] == "fetch" else x["urls"], {norm(u) for u in x["results"]}
+            rows += [(at(x["t"]), "read", u + ("" if norm(u) in served else " (not in pool)"), None, 0, 0) for u in urls]
+        else:  # trap_mismatch
+            rows.append((at(x["t"]), "error", f"trap mismatch: run expects {x['expects']}, proxy runs {x['runs']}",
+                         None, 0, 0))
+    for u in usage:
+        cost = u["cost_usd"] or graders.calculate_cost([u])[0]  # list price when Bifrost has none
+        rows.append((at(_epoch(u["at"])), "llm", f"{u['input_tokens']} in, {u['output_tokens']} out", u["model"],
+                     u["input_tokens"] + u["output_tokens"], cost))
+    # Stable sort: same-time rows keep log order, then Bifrost order, then extra.
+    rows = sorted(rows + [(s.t, s) for s in extra], key=lambda r: r[0])
+    steps, model, searched = [], None, False
+    for row in rows:
+        if isinstance(row[1], Step):
+            steps.append(row[1].model_copy(update=dict(i=len(steps) + 1)))
+            continue
+        t, kind, detail, m, tokens, cost = row
+        searched |= kind in ("search", "read")
+        # ponytail: phase from position, llm before the first search/read = plan, after = write. No check phase yet.
+        phase = "search" if kind != "llm" else "write" if searched else "plan"
+        if kind == "llm" and model and m != model:
+            steps.append(Step(i=len(steps) + 1, t=t, kind="switch", detail=f"{model} to {m}", model=m, phase=phase,
+                              tokens=0, cost_usd=0))
+        if kind == "llm":
+            model = m
+        steps.append(Step(i=len(steps) + 1, t=t, kind=kind, detail=detail, model=m, phase=phase, tokens=tokens,
+                          cost_usd=cost))
+    return steps
 
 
 def start_batch(batch_id: str, agent_ids: list[str], task: Task, trap, *, emit, bifrost_url: str,
@@ -291,7 +347,7 @@ def start_batch(batch_id: str, agent_ids: list[str], task: Task, trap, *, emit, 
     tmp = Path(tempfile.mkdtemp(prefix=f"assay-{batch_id}-"))
     procs = []
     try:
-        # ponytail: search log lives in tmp and goes with the batch, keep it when steps are built from it
+        # The search log lives in tmp: each run's steps are built from it when the run ends, then it goes with the batch.
         p, port = _mitmdump(tmp, "proxy.py", ["--mode", "upstream:http://127.0.0.1:9", "--set", "connection_strategy=lazy",
                                               "--set", "rawtcp=false"],
                             {"ASSAY_POOL_FILE": str(pool_file), "ASSAY_SEARCH_LOG": str(tmp / "search.jsonl"),
@@ -329,17 +385,33 @@ def start_batch(batch_id: str, agent_ids: list[str], task: Task, trap, *, emit, 
             # A started run must end, or it stays `running` forever.
             rec = begun[0].model_copy(update=dict(status="error", duration_s=0.0, steps=[Step(
                 i=1, t=0, kind="error", detail=f"runner: {e!r}"[:500], model=None, phase="write", tokens=0, cost_usd=0)]))
+        def failed(r, what, e):  # a done run that can't be traced or graded is an error, other statuses stay
+            return r.model_copy(update=dict(status="error" if r.status == "done" else r.status, steps=[*r.steps, Step(
+                i=len(r.steps) + 1, t=r.duration_s or 0, kind="error", model=None, phase="check", tokens=0,
+                cost_usd=0, detail=KEY_RE.sub("[redacted]", f"{what}: {e!r}")[:500])]))
+
+        # Failed runs spent tokens too, so every run's steps get its Bifrost calls. Only a done run needs them to grade.
+        usage, usage_error = [], None
+        try:
+            # Only one batch runs at a time and each concurrent run has its own slot: vk id + start time is the run.
+            usage = fetch_usage(bifrost_url, f"vk-run-{slot + 1}", rec.started_at)
+        except Exception as e:
+            usage_error = e
+        try:
+            steps = _timeline(tmp / "search.jsonl", rec.id, rec.started_at, usage, rec.steps)
+            rec = rec.model_copy(update=dict(steps=steps, metrics=rec.metrics.model_copy(update=dict(
+                steps=len(steps), tool_calls=sum(s.kind in ("search", "read", "llm") for s in steps)))))
+        except Exception as e:  # a bad log line must not leave the run `running`
+            rec = failed(rec, "timeline", e)
         if rec.status == "done":
             try:
-                # Only one batch runs at a time and each concurrent run has its own slot: vk id + start time is the run.
-                usage = fetch_usage(bifrost_url, f"vk-run-{slot + 1}", rec.started_at)
+                if usage_error:
+                    raise usage_error
                 rec = graders.grade_run(rec, task, pool, usage, judge)
             except Exception as e:
-                rec = rec.model_copy(update=dict(status="error", steps=[*rec.steps, Step(
-                    i=len(rec.steps) + 1, t=rec.duration_s, kind="error", model=None, phase="check", tokens=0,
-                    cost_usd=0, detail=KEY_RE.sub("[redacted]", f"grading: {e!r}")[:500])]))
+                rec = failed(rec, "grading", e)
         store.save(rec)
-        # ponytail: steps go out when the run ends, live steps come with the proxy+Bifrost log timeline
+        # ponytail: steps go out when the run ends, live steps need the logs tailed during the run
         for step in rec.steps:
             emit("step", StepEvent(run_id=rec.id, step=step))
         emit("run_done", RunDoneEvent(run_id=rec.id, status=rec.status, duration_s=rec.duration_s, metrics=rec.metrics))

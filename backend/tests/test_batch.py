@@ -118,10 +118,15 @@ def test_failed_runs_still_finish_the_batch(env):
     agent(runner.AGENTS_DIR, "crash", "#!/usr/bin/env python3\nimport sys\nsys.exit(3)\n")
     events = run(["crash"], None, srv, ["k1", "k2", "k3"])
     assert [d.status for n, d in events if n == "run_done"] == ["error"] * 3
-    steps = [d for n, d in events if n == "step"]
-    assert len(steps) == 3 and all(s.step.kind == "error" for s in steps)
+    # Failed runs spent tokens too: the fixture's Bifrost row (it predates the run, so t=0), then the exit.
+    # never_judge would have raised: not graded.
+    for r in store.list_runs(batch_id="b_test"):
+        full = store.get(r.id)
+        assert [(s.kind, s.model, s.tokens) for s in full.steps] == [("llm", "qwen3.8-27b", 17), ("error", None, 0)]
+        assert full.metrics.steps == 2 and full.metrics.tool_calls == 1
+        assert [d.step for n, d in events if n == "step" and d.run_id == r.id] == full.steps
     assert events[-1][0] == "batch_done"
-    assert srv.gets == []  # never graded, never fetched usage (never_judge would have raised)
+    assert len(srv.gets) == 3
 
 
 def test_lookups(env, tmp_path):
@@ -180,7 +185,7 @@ def test_done_fact_run_is_graded_from_bifrost_usage(env, monkeypatch):
     assert len(done) == len(recs) == 3
     for r in recs:
         assert r.status == "done" and r.metrics.success is True
-        assert r.metrics.tokens == 17 and r.metrics.steps == 0
+        assert r.metrics.tokens == 17 and r.metrics.steps == r.metrics.tool_calls == 1  # the one Bifrost row
         assert r.metrics.cost_usd == pytest.approx(2e-05)
         assert r.metrics.cost_by_model == {"qwen3.8-27b": pytest.approx(2e-05)}
     assert [d.metrics for d in sorted(done, key=lambda d: d.run_id)] == [r.metrics for r in sorted(recs, key=lambda r: r.id)]
@@ -255,3 +260,78 @@ def test_run_without_usage_is_error(env):
     assert [d.status for n, d in events if n == "run_done"] == ["error"] * 3
     for r in store.list_runs(batch_id="b_test"):
         assert r.status == "error" and r.steps[-1].detail.startswith("grading:")
+
+
+SEARCH_LOG = runner.BACKEND / "tests" / "fixtures" / "search_log.jsonl"  # captured: searcher agent through the real proxy
+RID, START = "run_c329ca2813eb", "2026-11-14T14:32:13.045Z"  # that run's id and started_at
+
+
+def test_timeline_merges_proxy_log_and_bifrost_usage(env, tmp_path):
+    srv, _ = env
+    # The captured Bifrost row, moved into the captured run's window, plus a copy on another model (a switch).
+    row = json.loads(srv.logs)["logs"][0]
+    srv.logs = json.dumps({"logs": [{**row, "timestamp": "2026-11-14T14:32:13.545Z"},
+                                    {**row, "alias": "gemma-4-26b-a4b-it", "timestamp": "2026-11-14T14:32:15.045Z"}]}).encode()
+    usage = runner.fetch_usage(f"http://127.0.0.1:{srv.server_port}/v1", "vk-run-1", START)
+    log = tmp_path / "search.jsonl"
+    captured = SEARCH_LOG.read_text("utf-8")
+    other = json.loads(captured.splitlines()[0]) | {"run_id": "run_other"}
+    log.write_text(captured + json.dumps(other) + "\n", encoding="utf-8")
+    error = runner.Step(i=1, t=3.0, kind="error", detail="exit 1", model=None, phase="write", tokens=0, cost_usd=0)
+    steps = runner._timeline(log, RID, START, usage, [error])
+    got = [(s.i, s.kind, s.detail, s.model, s.phase, s.tokens) for s in steps]
+    assert got == [
+        (1, "llm", "15 in, 2 out", "qwen3.8-27b", "plan", 17),
+        (2, "search", "python 3.0 release", None, "search", 0),
+        (3, "read", "https://docs-python.invalid/3.13/free-threading", None, "search", 0),
+        (4, "read", "https://docs-python.invalid/3.13/free-threading/", None, "search", 0),  # served: proxy drops the /
+        (5, "read", "https://docs-python.invalid/3.13/free-threading", None, "search", 0),  # httpx dropped the #gil
+        (6, "read", "http://not-in-pool.invalid/x (not in pool)", None, "search", 0),
+        (7, "switch", "qwen3.8-27b to gemma-4-26b-a4b-it", "gemma-4-26b-a4b-it", "write", 0),
+        (8, "llm", "15 in, 2 out", "gemma-4-26b-a4b-it", "write", 17),
+        (9, "error", "exit 1", None, "write", 0),
+    ]
+    assert [s.t for s in steps] == pytest.approx([0.5, 1.621631, 1.6366826, 1.6392248, 1.64323, 1.665486, 2.0, 2.0, 3.0])
+    assert [s.cost_usd for s in steps] == pytest.approx([2e-05, 0, 0, 0, 0, 0, 0, 2e-05, 0])
+
+
+def test_batch_runs_carry_their_timeline(env):
+    srv, _ = env
+    row = json.loads(srv.logs)["logs"][0]
+    srv.logs = json.dumps({"logs": [{**row, "timestamp": "2999-01-01T00:00:00Z"}]}).encode()  # after every search
+    agent(runner.AGENTS_DIR, "s", PROBE.replace("time.sleep(1.5)", "").replace(
+        "json.dumps(dict(", "'2008' or json.dumps(dict("))
+    events = run(["s"], None, srv, ["k1", "k2", "k3"])
+    recs = store.list_runs(batch_id="b_test")
+    assert len(recs) == 3
+    for r in recs:
+        full = store.get(r.id)
+        assert full.status == "done", full.steps
+        assert [(s.kind, s.detail) for s in full.steps] == [("search", "python 3.0 release"), ("llm", "15 in, 2 out")]
+        assert full.metrics.steps == 2 and full.metrics.tool_calls == 2
+        assert [d.step for n, d in events if n == "step" and d.run_id == r.id] == full.steps
+
+
+def test_bad_search_log_still_ends_the_run(env, monkeypatch):
+    srv, _ = env
+
+    def broken(*a):
+        raise KeyError("query")  # e.g. a log line in a shape the timeline does not know
+
+    monkeypatch.setattr(runner, "_timeline", broken)
+    events = run(["a"], None, srv, ["k1", "k2", "k3"])
+    assert [d.status for n, d in events if n == "run_done"] == ["error"] * 3
+    for r in store.list_runs(batch_id="b_test"):
+        assert store.get(r.id).steps[-1].detail.startswith("timeline: KeyError")
+
+
+def test_bad_search_log_keeps_budget_exceeded(env, monkeypatch):
+    srv, _ = env
+
+    def broken(*a):
+        raise KeyError("query")
+
+    monkeypatch.setattr(runner, "_timeline", broken)
+    agent(runner.AGENTS_DIR, "x", "#!/usr/bin/env python3\nimport sys\nsys.exit('402 budget_exceeded')\n")
+    events = run(["x"], None, srv, ["k1", "k2", "k3"])
+    assert [d.status for n, d in events if n == "run_done"] == ["budget_exceeded"] * 3
