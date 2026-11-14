@@ -83,3 +83,42 @@ def test_resume_skips_done_and_reruns_error_and_fallback(cli):
     assert sorted(r.repeat for r in new) == [1, 2] and all(r.status == "done" for r in new)
     assert bench.todo(["a"], TASK) == []
     assert json.loads(new[0].output.text)["search"] == 200  # went through the batch proxy
+
+
+def test_duplicate_flags_run_once(cli, capsys):
+    cli("--agents", "a,a", "--tasks", f"{TASK},{TASK}", "--dry-run")
+    assert "1 batches, 3 runs" in capsys.readouterr().out
+    with pytest.raises(ValueError):
+        runner.start_batch("bench_x", ["a"], runner.find_task(TASK), None, emit=print, bifrost_url="http://x/v1",
+                           vks=["k1", "k2"], jobs=[("a", 1), ("a", 1)])
+
+
+# Writes a heartbeat line every 0.1s until killed.
+SLEEPER = """#!/usr/bin/env python3
+import sys, time
+while True:
+    open(sys.argv[0] + ".beat", "a").write(".")
+    time.sleep(0.1)
+"""
+
+
+def test_ctrl_c_kills_the_batch_processes(cli):
+    import _thread
+    import threading
+    import time
+
+    d = agent(runner.AGENTS_DIR, "sleepy", SLEEPER)
+    beat = d / "run.beat"
+    def ctrl_c_once_running():
+        while not beat.exists():
+            time.sleep(0.1)
+        _thread.interrupt_main()
+
+    threading.Thread(target=ctrl_c_once_running, daemon=True).start()
+    with pytest.raises(KeyboardInterrupt):
+        cli("--agents", "sleepy", "--tasks", TASK)
+    time.sleep(1)
+    size = beat.stat().st_size
+    time.sleep(1)
+    assert beat.stat().st_size == size  # and is dead now
+    assert runner.LIVE == set()

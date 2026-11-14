@@ -62,8 +62,8 @@ def main(argv=None) -> None:
     ap.add_argument("--dry-run", action="store_true", help="print the batch plan and exit")
     a = ap.parse_args(argv)
     agents, tasks = agent_ids(), task_ids()
-    pick_a = a.agents.split(",") if a.agents else agents
-    pick_t = a.tasks.split(",") if a.tasks else tasks
+    pick_a = list(dict.fromkeys(a.agents.split(","))) if a.agents else agents
+    pick_t = list(dict.fromkeys(a.tasks.split(","))) if a.tasks else tasks
     if bad := [x for x in pick_a if x not in agents] + [x for x in pick_t if x not in tasks]:
         ap.error(f"not a benchmark agent or task: {', '.join(bad)}")
 
@@ -85,8 +85,14 @@ def main(argv=None) -> None:
                 print(f"  {data.run_id} {data.status}", flush=True)
 
         # Sequential: start_batch's per-slot Bifrost usage lookup assumes one batch at a time.
-        runner.start_batch(bid, list(dict.fromkeys(x for x, _ in jobs)), runner.find_task(t), task_trap(t),
-                           emit=emit, bifrost_url=bifrost, vks=vks, jobs=jobs).join()
+        th = runner.start_batch(bid, list(dict.fromkeys(x for x, _ in jobs)), runner.find_task(t), task_trap(t),
+                                emit=emit, bifrost_url=bifrost, vks=vks, jobs=jobs)
+        try:
+            while th.is_alive():
+                th.join(0.5)  # a bare join ignores Ctrl-C on Windows
+        except KeyboardInterrupt:
+            runner.kill_all()  # its runs stay `running` in SQLite and the next resume runs them again
+            raise
 
 
 if __name__ == "__main__":
