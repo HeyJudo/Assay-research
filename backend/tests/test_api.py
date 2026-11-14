@@ -1,9 +1,12 @@
 import json
+import os
+import threading
+from types import SimpleNamespace
 
 import pytest
 from fastapi.testclient import TestClient
 
-from assay import judge_agreement, runner, store
+from assay import api, judge_agreement, runner, store
 from assay.api import app
 from assay.store import FIXTURE
 
@@ -147,3 +150,144 @@ def test_tasks_are_the_benchmark_suite_without_practice(client):
     assert len(body) == 16 and not any(t["id"].startswith("practice") for t in body)
     hinton = next(t for t in body if t["id"] == "fact-hinton-university-trap")
     assert (hinton["type"], hinton["answer"]) == ("fact", "1582")  # from data/tasks/fact-hinton-university-trap.json
+
+
+BRIEF_BODY = {"subject": "Tavily", "meeting_time": "2026-11-20T01:00:00Z", "version": "briefing-baseline"}
+BRIEF_TEXT = "## Verified\n- News [source](https://tavily.com)\n## Uncertain\nNone\n## Not found\nNone\n## Open questions\n- Priorities?"
+
+
+@pytest.fixture
+def briefing(monkeypatch):
+    job = SimpleNamespace(entered=threading.Event(), release=threading.Event(), finished=threading.Event(),
+                          error=None, seen=None, text=BRIEF_TEXT)
+    monkeypatch.setenv("BIFROST_URL", "http://bifrost.test/v1")
+    monkeypatch.setenv("BIFROST_RUN_VK_1", "sk-bf-live-test")
+    monkeypatch.setenv("TAVILY_API_KEY", "tvly-live-test")
+    monkeypatch.setenv("OPENAI_API_KEY", "parent-key")
+    monkeypatch.setenv("NO_PROXY", "parent-host")
+
+    def brief(*args):
+        job.seen = (args, {k: os.environ[k] for k in ("OPENAI_BASE_URL", "OPENAI_API_KEY", "TAVILY_API_KEY", "NO_PROXY")})
+        job.entered.set()
+        assert job.release.wait(5)
+        if job.error:
+            raise job.error
+        return job.text
+
+    save = store.save
+
+    def saved(rec):
+        save(rec)
+        if rec.task_id == "brief-live" and rec.status != "running":
+            job.finished.set()
+
+    monkeypatch.setattr(api.briefing_agent, "brief", brief)
+    monkeypatch.setattr(store, "save", saved)
+    monkeypatch.setattr(api.runner, "fetch_usage", lambda *args: [
+        {"model": "qwen3.8-27b", "input_tokens": 10, "output_tokens": 20, "cost_usd": 0.001}])
+    monkeypatch.setattr(api.graders, "grade_run", lambda *args: pytest.fail("live briefs must not be judged"))
+    yield job
+    job.release.set()
+    if job.entered.is_set():
+        assert job.finished.wait(5)
+        with api.BRIEF_LOCK:
+            pass
+
+
+@pytest.mark.parametrize("version", ["baseline", "cheap-first", "evidence-gated"])
+def test_live_brief_running_to_done(client, briefing, version):
+    response = client.post("/api/brief", json={**BRIEF_BODY, "version": f"briefing-{version}"})
+    assert response.status_code == 200
+    rid = response.json()["run_id"]
+    assert briefing.entered.wait(5)
+    running = client.get(f"/api/runs/{rid}").json()
+    assert running["status"] == "running"
+    assert running["batch_id"].startswith("brief_") and not running["batch_id"].startswith("bench_")
+    assert (running["task_id"], running["task_type"], running["trap"], running["repeat"]) == ("brief-live", "briefing", None, 1)
+    meta = api.runner.find_agent(f"briefing-{version}")[1]
+    assert running["config"] == {"agent_version": meta["version"], "models": meta["models"],
+                                 "prompt_hash": meta["prompt_hash"], "pool_version": "live",
+                                 "trap_seed": None, "fallback_used": False}
+    assert briefing.seen == (("Tavily", BRIEF_BODY["meeting_time"], version), {
+        "OPENAI_BASE_URL": "http://bifrost.test/v1", "OPENAI_API_KEY": "sk-bf-live-test",
+        "TAVILY_API_KEY": "tvly-live-test", "NO_PROXY": "*"})
+    assert client.post("/api/brief", json=BRIEF_BODY).status_code == 409
+    briefing.release.set()
+    assert briefing.finished.wait(5)
+    done = client.get(f"/api/runs/{rid}").json()
+    assert done["status"] == "done" and done["output"]["text"] == BRIEF_TEXT
+    assert done["duration_s"] >= 0
+    assert done["claims"] == [] and done["metrics"]["claims_supported_pct"] is None
+    assert (done["metrics"]["cost_usd"], done["metrics"]["tokens"], done["metrics"]["cost_by_model"]) == (
+        0.001, 30, {"qwen3.8-27b": 0.001})
+    assert client.get("/api/leaderboard").json() == LEADERBOARD_FIXTURE
+    assert os.environ["OPENAI_API_KEY"] == "parent-key" and os.environ["NO_PROXY"] == "parent-host"
+
+
+def test_live_brief_unknown_version(client):
+    assert client.post("/api/brief", json={**BRIEF_BODY, "version": "briefing-nope"}).status_code == 422
+
+
+def test_live_brief_bracketed_sources_become_clickable(client, briefing):
+    briefing.text = BRIEF_TEXT + "\n- Update [https://tavily.com/news]"
+    rid = client.post("/api/brief", json=BRIEF_BODY).json()["run_id"]
+    briefing.release.set()
+    assert briefing.finished.wait(5)
+    record = client.get(f"/api/runs/{rid}").json()
+    assert record["status"] == "done"
+    assert record["output"]["text"] == BRIEF_TEXT + "\n- Update [https://tavily.com/news](https://tavily.com/news)"
+
+
+def test_live_brief_refuses_running_batch(client, monkeypatch):
+    monkeypatch.setitem(api.BATCHES, "busy", {"status": SimpleNamespace(status="running")})
+    assert client.post("/api/brief", json=BRIEF_BODY).status_code == 409
+
+
+def test_batch_refuses_running_brief(client, briefing, monkeypatch):
+    monkeypatch.setenv("RUN_PASSCODE", "test-passcode")
+    client.post("/api/brief", json=BRIEF_BODY)
+    assert briefing.entered.wait(5)
+    response = client.post("/api/batches", json={"agents": ["briefing-baseline"], "task_id": "brief-tavily",
+                                                "trap": None, "passcode": "test-passcode"})
+    assert response.status_code == 409
+
+
+def test_live_brief_missing_key_stops_polling(client, briefing, monkeypatch):
+    monkeypatch.delenv("BIFROST_RUN_VK_1")
+    rid = client.post("/api/brief", json=BRIEF_BODY).json()["run_id"]
+    assert briefing.finished.wait(5)
+    with api.BRIEF_LOCK:
+        pass
+    record = client.get(f"/api/runs/{rid}").json()
+    assert record["status"] == "error" and "BIFROST_RUN_VK_1" in record["steps"][0]["detail"]
+
+
+@pytest.mark.parametrize("invalid", [{"subject": "x" * 151}, {"subject": ""},
+                                     {"meeting_time": "tomorrow"}, {"meeting_time": "2026-11-20"}])
+def test_live_brief_validates_request(client, invalid):
+    assert client.post("/api/brief", json={**BRIEF_BODY, **invalid}).status_code == 422
+
+
+def test_live_brief_error_stops_polling(client, briefing):
+    briefing.error = RuntimeError("search failed tvly-live-test sk-bf-live-test")
+    rid = client.post("/api/brief", json=BRIEF_BODY).json()["run_id"]
+    briefing.release.set()
+    assert briefing.finished.wait(5)
+    record = client.get(f"/api/runs/{rid}").json()
+    assert record["status"] == "error"
+    assert record["steps"][0]["kind"] == "error"
+    assert record["steps"][0]["detail"] == "search failed [redacted] [redacted]"
+
+
+@pytest.mark.parametrize("unavailable", [False, True])
+def test_live_brief_without_usage_still_done(client, briefing, monkeypatch, unavailable):
+    def usage(*args):
+        if unavailable:
+            raise OSError("Bifrost logs unavailable")
+        return []
+    monkeypatch.setattr(api.runner, "fetch_usage", usage)
+    rid = client.post("/api/brief", json=BRIEF_BODY).json()["run_id"]
+    briefing.release.set()
+    assert briefing.finished.wait(5)
+    record = client.get(f"/api/runs/{rid}").json()
+    assert record["status"] == "done" and record["metrics"]["cost_usd"] == 0

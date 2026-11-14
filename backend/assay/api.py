@@ -7,7 +7,9 @@ import asyncio
 import hmac
 import json
 import os
+import re
 import threading
+import time
 import uuid
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
@@ -16,10 +18,11 @@ from pathlib import Path
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, StreamingResponse
 
-from assay import bench, judge_agreement, runner, store
+from agents import briefing_agent
+from assay import bench, graders, judge_agreement, runner, store
 from assay.leaderboard import aggregate
-from assay.models import (Agent, BatchCreated, BatchRequest, BatchStatus, Compare, JudgeAgreement,
-                          LeaderboardRow, RunRecord, Task)
+from assay.models import (Agent, BatchCreated, BatchRequest, BatchStatus, BriefRequest, Compare, JudgeAgreement,
+                          LeaderboardRow, RunConfig, RunMetrics, RunOutput, RunRecord, Step, Task)
 
 ROOT = Path(__file__).resolve().parents[2]
 FIXTURES = ROOT / "web" / "src" / "fixtures"  # ponytail: one copy shared with the web app
@@ -107,6 +110,88 @@ def compare(a: str, b: str, batch_id: str | None = None) -> Compare:
 # ponytail: in memory, a restart forgets batches (their runs stay in SQLite)
 BATCHES: dict[str, dict] = {}  # batch id -> {"status": BatchStatus, "events": [(name, json)]}
 BATCH_LOCK = threading.Lock()
+BRIEF_LOCK = threading.Lock()  # live briefs share run slot 1 and the process environment
+
+
+@app.post("/api/brief")
+def create_brief(req: BriefRequest):
+    version = req.version.removeprefix("briefing-")
+    if version not in {"baseline", "cheap-first", "evidence-gated"}:
+        raise HTTPException(422, "unknown briefing version")
+    found = runner.find_agent(f"briefing-{version}")
+    if found is None:
+        raise HTTPException(503, "briefing agent not installed")
+    _, meta = found
+    config = RunConfig(agent_version=meta["version"], models=meta["models"], prompt_hash=meta["prompt_hash"],
+                       pool_version="live", trap_seed=None, fallback_used=False)
+    rec = RunRecord(
+        id=f"run_{uuid.uuid4().hex[:12]}", batch_id=f"brief_{uuid.uuid4().hex}",
+        agent_id=f"briefing-{version}", task_id="brief-live", task_type="briefing", trap=None, repeat=1,
+        status="running", started_at=datetime.now(timezone.utc).isoformat(), duration_s=None, config=config,
+        output=RunOutput(text="", abstained=False), steps=[], claims=[],
+        metrics=RunMetrics(success=False, steps=0, tool_calls=0, tokens=0, cost_usd=0, cost_by_model={},
+                           switched=False, trap_fell=False, abstention=None, claims_supported_pct=None))
+    env = {"OPENAI_BASE_URL": os.environ.get("BIFROST_URL") or "http://localhost:8080/v1",
+           "OPENAI_API_KEY": os.environ.get("BIFROST_RUN_VK_1", ""),
+           "TAVILY_API_KEY": os.environ.get("TAVILY_API_KEY", ""), "NO_PROXY": "*", "no_proxy": "*"}
+    with BATCH_LOCK:
+        if any(b["status"].status == "running" for b in BATCHES.values()) or not BRIEF_LOCK.acquire(blocking=False):
+            raise HTTPException(409, "another run is running")
+    t0 = time.monotonic()
+
+    def failed(error):
+        message = str(error)
+        for key in (env["OPENAI_API_KEY"], env["TAVILY_API_KEY"]):
+            if key:
+                message = message.replace(key, "[redacted]")
+        rec.status = "error"
+        rec.steps = [Step(i=1, t=time.monotonic() - t0, kind="error", detail=runner.KEY_RE.sub("[redacted]", message)[:500],
+                          model=None, phase="write", tokens=0, cost_usd=0)]
+        rec.metrics.steps = 1
+
+    def work():
+        previous = {k: os.environ.get(k) for k in env}
+        try:
+            if not env["OPENAI_API_KEY"] or not env["TAVILY_API_KEY"]:
+                raise ValueError("set BIFROST_RUN_VK_1 and TAVILY_API_KEY for live briefings")
+            os.environ.update(env)
+            # Use the supplied UTC date, which can differ from the user's local meeting date.
+            rec.output.text = briefing_agent.brief(req.subject, req.meeting_time, version)
+            # Models sometimes bracket URLs without Markdown's link target.
+            rec.output.text = re.sub(r"\[(https?://[^\s\]]+)\](?!\()", r"[\1](\1)", rec.output.text)
+            rec.status = "done"
+            # No frozen pool: leave claims and success ungraded.
+            try:
+                usage = runner.fetch_usage(env["OPENAI_BASE_URL"], "vk-run-1", rec.started_at)
+                cost, by_model, tokens = graders.calculate_cost(usage)
+                rec.metrics.cost_usd, rec.metrics.cost_by_model, rec.metrics.tokens = cost, by_model, tokens
+            except Exception:
+                pass  # Usage is optional for live briefs, so keep zero cost when unavailable.
+        except Exception as error:
+            failed(error)
+        finally:
+            for k, value in previous.items():
+                if value is None:
+                    os.environ.pop(k, None)
+                else:
+                    os.environ[k] = value
+            try:
+                rec.duration_s = time.monotonic() - t0
+                store.save(rec)
+            finally:
+                BRIEF_LOCK.release()
+
+    try:
+        store.save(rec)
+        threading.Thread(target=work, name=rec.batch_id, daemon=True).start()
+    except Exception as error:
+        try:
+            failed(error)
+            rec.duration_s = time.monotonic() - t0
+            store.save(rec)
+        finally:
+            BRIEF_LOCK.release()
+    return {"run_id": rec.id}
 
 
 @app.post("/api/batches")
@@ -120,7 +205,7 @@ def create_batch(req: BatchRequest) -> BatchCreated:
     if task is None:
         raise HTTPException(404, "task not found")
     with BATCH_LOCK:
-        if any(b["status"].status == "running" for b in BATCHES.values()):
+        if BRIEF_LOCK.locked() or any(b["status"].status == "running" for b in BATCHES.values()):
             raise HTTPException(409, "another batch is running")
         bid = f"b_{uuid.uuid4().hex[:12]}"
         now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
