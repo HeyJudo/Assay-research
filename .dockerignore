@@ -4,5 +4,8 @@
 **/.venv
 **/dist
 **/__pycache__
-bifrost
+bifrost/*
+!bifrost/config.json
 **/*.db
+**/.pytest_cache
+data/labels
