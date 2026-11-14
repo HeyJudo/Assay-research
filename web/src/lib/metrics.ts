@@ -8,13 +8,14 @@ export type Weights = { accuracy: number; cost: number; trap: number; honesty: n
 export const defaultWeights: Weights = { accuracy: 40, cost: 20, trap: 25, honesty: 15 }
 
 export function rankRows(rows: LeaderboardRow[], weights: Weights) {
-  const finiteCosts = rows.map(row => row.cost_per_correct).filter(n => Number.isFinite(n) && n >= 0)
+  const finiteCosts = rows.map(row => row.cost_per_correct).filter((n): n is number => n != null && Number.isFinite(n) && n >= 0)
   const cheapest = finiteCosts.length ? Math.min(...finiteCosts) : 0
   const total = Object.values(weights).reduce((a, b) => a + b, 0)
-  return rows.map(row => ({ ...row, score: total ? 100 * (
-    row.accuracy * weights.accuracy + (row.cost_per_correct === 0 ? 1 : row.cost_per_correct > 0 ? cheapest / row.cost_per_correct : 0) * weights.cost +
-    row.trap_resistance * weights.trap + row.honesty * weights.honesty
-  ) / total : 0 })).sort((a, b) => b.score - a.score || a.agent_id.localeCompare(b.agent_id))
+  // Missing metric (null: no denominator) scores 0 on that axis.
+  return rows.map(row => { const cost = row.cost_per_correct; return { ...row, score: total ? 100 * (
+    (row.accuracy ?? 0) * weights.accuracy + (cost === 0 ? 1 : cost != null && cost > 0 ? cheapest / cost : 0) * weights.cost +
+    (row.trap_resistance ?? 0) * weights.trap + (row.honesty ?? 0) * weights.honesty
+  ) / total : 0 } }).sort((a, b) => b.score - a.score || a.agent_id.localeCompare(b.agent_id))
 }
 
 /** Local batch aggregation only; never substitutes full-benchmark fixture scores. */
