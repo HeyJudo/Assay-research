@@ -1,5 +1,6 @@
 """API (PRD §8). Runs come from SQLite (seeded from fixtures when empty). Leaderboard and compare aggregate benchmark runs
-(batch ids starting "bench_") and fall back to fixtures until one exists. Agents and tasks read fixtures.
+(batch ids starting "bench_") and fall back to fixtures until one exists. Agents come from backend/agents/*/agent.json,
+tasks from data/tasks.
 Batches run through runner.start_batch."""
 
 import asyncio
@@ -15,7 +16,7 @@ from pathlib import Path
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, StreamingResponse
 
-from assay import judge_agreement, runner, store
+from assay import bench, judge_agreement, runner, store
 from assay.leaderboard import aggregate
 from assay.models import (Agent, BatchCreated, BatchRequest, BatchStatus, Compare, JudgeAgreement,
                           LeaderboardRow, RunRecord, Task)
@@ -29,8 +30,6 @@ def load(name: str, model):
     return [model.model_validate(x) for x in json.loads((FIXTURES / name).read_text("utf-8"))]
 
 
-AGENTS = load("agents.json", Agent)
-TASKS = load("tasks.json", Task)
 LEADERBOARD = load("leaderboard.json", LeaderboardRow)
 
 @asynccontextmanager
@@ -74,12 +73,13 @@ def judge_agreement_result() -> JudgeAgreement | None:
 
 @app.get("/api/agents")
 def agents() -> list[Agent]:
-    return AGENTS
+    metas = [(a, runner.find_agent(a)[1]) for a in bench.agent_ids()]
+    return [Agent(id=a, name=m["name"], kind=m["kind"], description=m["description"]) for a, m in metas]
 
 
 @app.get("/api/tasks")
 def tasks() -> list[Task]:
-    return TASKS
+    return [runner.find_task(t) for t in bench.task_ids()]
 
 
 @app.get("/api/runs")

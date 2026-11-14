@@ -1,1 +1,1 @@
-{"version":"1.0","models":["gemma-4-26b-a4b-it","qwen3.8-27b"],"prompt_hash":"64c48849"}
+{"version":"1.0","models":["gemma-4-26b-a4b-it","qwen3.8-27b"],"prompt_hash":"64c48849","name":"Briefing Agent: Cheap-first","kind":"ours","description":"Starts on the small model, switches to the main model when a fixed rule fires."}

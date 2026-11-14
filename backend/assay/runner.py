@@ -45,6 +45,26 @@ BUDGET_RE = re.compile(r"budget[_ ]exceeded", re.I)
 KEY_RE = re.compile(r"(?<![A-Za-z0-9])(?:sk-bf-|sk-|tvly-|gsk_|AIza|csk-)[A-Za-z0-9_\-]+")
 # ponytail: measured Bifrost writes a log row ~5s after the call, fixed wait, poll if it proves flaky.
 BIFROST_LOG_DELAY_S = 7
+LIVE: set[subprocess.Popen] = set()  # every agent and add-on process still running, for kill_all
+
+
+def _kill_tree(p: subprocess.Popen) -> None:
+    if os.name == "nt":
+        subprocess.run(["taskkill", "/T", "/F", "/PID", str(p.pid)], capture_output=True)
+    else:
+        try:
+            os.killpg(p.pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+
+
+def kill_all() -> None:
+    """Kill every agent and add-on process we started. The benchmark CLI calls it on Ctrl-C: its batch thread is a
+    daemon, so its cleanup never runs when the interpreter exits."""
+    for p in list(LIVE):
+        _kill_tree(p)
+        p.kill()
+    LIVE.clear()
 
 
 def _command(run: Path) -> list[str]:
@@ -132,17 +152,13 @@ def run_once(agent_dir: Path, task: Task, *, agent_version: str, models: list[st
                     flags = dict(start_new_session=True)
                 p = subprocess.Popen(_command(agent_dir.resolve() / "run"), cwd=tmp, env=env,
                                      stdin=subprocess.DEVNULL, stdout=so, stderr=se, **flags)
+                LIVE.add(p)
                 try:
                     p.wait(timeout=timeout_s)
                 finally:
                     # Always kill the tree: a surviving grandchild must not outlive the run.
-                    if os.name == "nt":
-                        subprocess.run(["taskkill", "/T", "/F", "/PID", str(p.pid)], capture_output=True)
-                    else:
-                        try:
-                            os.killpg(p.pid, signal.SIGKILL)
-                        except ProcessLookupError:
-                            pass
+                    _kill_tree(p)
+                    LIVE.discard(p)
                     if p.poll() is None:
                         p.wait(timeout=10)
             stderr = (Path(tmp) / "stderr").read_text(encoding="utf-8", errors="replace")
@@ -201,6 +217,7 @@ def _mitmdump(tmp: Path, script: str, args: list[str], env: dict) -> tuple[subpr
                               "-s", str(BACKEND / "assay" / script), "--listen-host", "127.0.0.1",
                               "--listen-port", str(port), "--set", f"confdir={tmp}", *args],
                              cwd=BACKEND, env={**os.environ, **env}, stdout=f, stderr=subprocess.STDOUT)
+    LIVE.add(p)
     for _ in range(300):
         if p.poll() is not None:
             break
@@ -220,6 +237,7 @@ def _stop(procs: list[subprocess.Popen], tmp: Path) -> None:
     for p in procs:
         p.kill()
         p.wait()
+        LIVE.discard(p)
     shutil.rmtree(tmp, ignore_errors=True)
 
 
@@ -243,8 +261,10 @@ def fetch_usage(bifrost_url: str, vk_id: str, since: str) -> list[dict]:
 
 def start_batch(batch_id: str, agent_ids: list[str], task: Task, trap, *, emit, bifrost_url: str,
                 vks: list[str], timeout_s: float = 600,
-                judge: Callable[[str], str] = graders._judge_http) -> threading.Thread:
+                judge: Callable[[str], str] = graders._judge_http,
+                jobs: list[tuple[str, int]] | None = None) -> threading.Thread:
     """Run each agent REPEATS times on task, all runs in parallel. Run slot n gets vks[n-1] as its Bifrost key.
+    jobs, (agent id, repeat) pairs, runs only those repeats: the benchmark CLI resumes with it.
 
     Starts the batch's search proxy (task pool + trap) and, for model_outage, the outage pass-through, then
     returns the thread running the batch. emit(name, event) gets the SSE events from PRD §8, batch_done last.
@@ -255,7 +275,10 @@ def start_batch(batch_id: str, agent_ids: list[str], task: Task, trap, *, emit, 
             raise ValueError(f"unknown agent {a}")
         if not all(found[1].get(k) for k in ("version", "models", "prompt_hash")):
             raise ValueError(f"{a}/agent.json needs version, models and prompt_hash")
-    jobs = [(a, r) for a in agent_ids for r in range(1, REPEATS + 1)]
+    if jobs is None:
+        jobs = [(a, r) for a in agent_ids for r in range(1, REPEATS + 1)]
+    if not jobs or len(set(jobs)) != len(jobs) or any(a not in agents or r not in range(1, REPEATS + 1) for a, r in jobs):
+        raise ValueError(f"jobs must be distinct (agent in {agent_ids}, repeat 1..{REPEATS})")
     if len(vks) < len(jobs) or not all(vks[:len(jobs)]):
         raise ValueError(f"set BIFROST_RUN_VK_1..{len(jobs)}: one Bifrost key per parallel run")
     pool_file = find_pool(task.id)
