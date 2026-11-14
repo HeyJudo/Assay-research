@@ -1,0 +1,5 @@
+{"t": 1794666734.666631, "kind": "search", "query": "python 3.0 release", "status": 200, "run_id": "run_c329ca2813eb", "results": ["https://news-python.invalid/313-release", "https://news-python.invalid/312-release", "https://docs-python.invalid/3.13/free-threading", "https://docs-python.invalid/3.13/jit", "https://blog-python.invalid/new-repl"]}
+{"t": 1794666734.6816826, "kind": "fetch", "url": "https://docs-python.invalid/3.13/free-threading", "run_id": "run_c329ca2813eb", "results": ["https://docs-python.invalid/3.13/free-threading"]}
+{"t": 1794666734.6842248, "kind": "fetch", "url": "https://docs-python.invalid/3.13/free-threading/", "run_id": "run_c329ca2813eb", "results": ["https://docs-python.invalid/3.13/free-threading"]}
+{"t": 1794666734.68823, "kind": "fetch", "url": "https://docs-python.invalid/3.13/free-threading", "run_id": "run_c329ca2813eb", "results": ["https://docs-python.invalid/3.13/free-threading"]}
+{"t": 1794666734.710486, "kind": "fetch", "url": "http://not-in-pool.invalid/x", "run_id": "run_c329ca2813eb", "results": []}
