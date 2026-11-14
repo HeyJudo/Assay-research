@@ -165,6 +165,9 @@ def create_brief(req: BriefRequest):
                 usage = runner.fetch_usage(env["OPENAI_BASE_URL"], "vk-run-1", rec.started_at)
                 cost, by_model, tokens = graders.calculate_cost(usage)
                 rec.metrics.cost_usd, rec.metrics.cost_by_model, rec.metrics.tokens = cost, by_model, tokens
+                # Live briefs skip the proxy, so the receipt has Bifrost calls only (no search log to read).
+                rec.steps = runner._timeline(ROOT / "no-proxy-log", rec.id, rec.started_at, usage, [])
+                rec.metrics.steps, rec.metrics.tool_calls = len(rec.steps), sum(s.kind == "llm" for s in rec.steps)
             except Exception:
                 pass  # Usage is optional for live briefs, so keep zero cost when unavailable.
         except Exception as error:

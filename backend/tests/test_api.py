@@ -184,7 +184,8 @@ def briefing(monkeypatch):
     monkeypatch.setattr(api.briefing_agent, "brief", brief)
     monkeypatch.setattr(store, "save", saved)
     monkeypatch.setattr(api.runner, "fetch_usage", lambda *args: [
-        {"model": "qwen3.8-27b", "input_tokens": 10, "output_tokens": 20, "cost_usd": 0.001}])
+        {"model": "qwen3.8-27b", "input_tokens": 10, "output_tokens": 20, "cost_usd": 0.001,
+         "at": "2026-11-20T01:00:05+00:00"}])  # shape of runner.fetch_usage rows
     monkeypatch.setattr(api.graders, "grade_run", lambda *args: pytest.fail("live briefs must not be judged"))
     yield job
     job.release.set()
@@ -220,6 +221,10 @@ def test_live_brief_running_to_done(client, briefing, version):
     assert done["claims"] == [] and done["metrics"]["claims_supported_pct"] is None
     assert (done["metrics"]["cost_usd"], done["metrics"]["tokens"], done["metrics"]["cost_by_model"]) == (
         0.001, 30, {"qwen3.8-27b": 0.001})
+    # Receipt shows the Bifrost call (no proxy log on live briefs, so no search steps).
+    assert [(s["kind"], s["detail"], s["model"], s["tokens"], s["cost_usd"]) for s in done["steps"]] == [
+        ("llm", "10 in, 20 out", "qwen3.8-27b", 30, 0.001)]
+    assert (done["metrics"]["steps"], done["metrics"]["tool_calls"]) == (1, 1)
     assert client.get("/api/leaderboard").json() == LEADERBOARD_FIXTURE
     assert os.environ["OPENAI_API_KEY"] == "parent-key" and os.environ["NO_PROXY"] == "parent-host"
 
