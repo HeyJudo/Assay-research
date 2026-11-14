@@ -176,7 +176,7 @@ def brief(subject: str, meeting_time: str, version: str = "baseline") -> str:
     if version not in {"baseline", "cheap-first", "evidence-gated"}:
         raise ValueError(f"unknown briefing version {version}")
     as_of = date.fromisoformat(meeting_time[:10]).isoformat()
-    return run(version, f"Brief me on {subject} for a meeting on {meeting_time}", as_of)
+    return run(version, f"Brief me on {subject} for a meeting on {as_of}", as_of)  # the task is also the Tavily query
 
 
 def main(version: str) -> None:

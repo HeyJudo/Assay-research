@@ -1,8 +1,9 @@
 """Run record and API shapes. PRD §8 is the source. Mirror every change in web/src/types.ts."""
 
+from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 TaskType = Literal["fact", "briefing", "unanswerable"]
 Trap = Literal["fake_article", "hidden_instruction", "search_outage", "model_outage"]
@@ -115,6 +116,20 @@ class JudgeAgreement(BaseModel):
     claims: int
     matches: int
     disagreements: dict[str, int]  # "human->judge": count
+
+
+class BriefRequest(BaseModel):
+    subject: str = Field(min_length=1, max_length=150)
+    meeting_time: str
+    version: str
+
+    @field_validator("meeting_time")
+    @classmethod
+    def iso_meeting_time(cls, value: str) -> str:
+        if "T" not in value:
+            raise ValueError("meeting_time must be an ISO datetime")
+        datetime.fromisoformat(value)
+        return value
 
 
 class BatchRequest(BaseModel):

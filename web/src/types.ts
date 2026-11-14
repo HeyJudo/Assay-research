@@ -118,6 +118,13 @@ export interface Compare {
   b: LeaderboardRow
 }
 
+/** POST /api/brief */
+export interface BriefRequest {
+  subject: string // max 150 characters
+  meeting_time: string // ISO datetime
+  version: string
+}
+
 /** POST /api/batches. 1–3 agents. Repeats are fixed at 3 (PRD §13), so there is no repeats field. */
 export interface BatchRequest {
   agents: string[]

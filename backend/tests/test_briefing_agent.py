@@ -165,7 +165,7 @@ def test_live_brief_builds_contract_task(monkeypatch):
     seen = []
     monkeypatch.setattr(agent, "run", lambda version, task, as_of: seen.append((version, task, as_of)) or "brief")
     assert agent.brief("Acme", "2026-11-20T09:00:00Z", "evidence-gated") == "brief"
-    assert seen == [("evidence-gated", "Brief me on Acme for a meeting on 2026-11-20T09:00:00Z", "2026-11-20")]
+    assert seen == [("evidence-gated", "Brief me on Acme for a meeting on 2026-11-20", "2026-11-20")]  # PRD §8 task format, no clock time in the search
 
 
 def test_runner_discovers_all_three_agents():
