@@ -8,6 +8,10 @@ services:
     env_file:
       - path: .env
         required: false
+    volumes:
+      - assay-state:/app/state  # assay.db survives `docker compose down` and rebuilds
+    depends_on:
+      - bifrost
 
   bifrost:
     image: maximhq/bifrost
@@ -18,3 +22,6 @@ services:
     env_file:
       - path: .env
         required: false
+
+volumes:
+  assay-state:

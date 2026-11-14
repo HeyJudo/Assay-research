@@ -113,6 +113,29 @@ Set `ASSAY_SEED_FIXTURES=1` to load the fixture runs into an empty DB for fronte
 npx -y @maximhq/bifrost -app-dir ./bifrost
 ```
 
+## Deploy
+
+One image runs everywhere. Keys and `RUN_PASSCODE` come from env only. The image holds no `.env`, and `bifrost/config.json` has `env.*` references only.
+
+- **`docker compose up`:** app + a separate Bifrost service. `assay.db` lives in the `assay-state` volume, so runs survive `docker compose down` and rebuilds (`down -v` wipes them).
+- **Single container (Hugging Face Space):** with no `BIFROST_URL` set, the image starts its bundled Bifrost on `127.0.0.1:8080`, so only the app port faces the internet. Each batch starts its own mitmproxy search proxy on localhost, as it does locally.
+
+**Hugging Face Space (Docker SDK):**
+
+1. Create a Space with the Docker SDK.
+2. In Space settings → Secrets, add every name from `.env.example` that has a value in your `.env`. Leave `BIFROST_URL` unset.
+3. Push the tracked files, with a Space README that sets the port:
+
+```bash
+git archive HEAD -o /tmp/assay.tar && mkdir /tmp/space && tar -xf /tmp/assay.tar -C /tmp/space
+printf -- '---\ntitle: Assay\nsdk: docker\napp_port: 8000\n---\n' | cat - README.md > /tmp/space/README.md
+HF_TOKEN=... uvx --from huggingface_hub hf upload <user>/<space> /tmp/space . --repo-type space
+```
+
+The free Space disk is not persistent: a restart clears `assay.db` and Bifrost's logs. The leaderboard falls back to the committed fixtures until a benchmark exists.
+
+**Fallback if the Space fails on judging day (PRD §12):** run `docker compose up` on a laptop and demo at http://localhost:8000, with the recorded video as backup. One batch runs at a time, and the Run button needs `RUN_PASSCODE`.
+
 ## Repository layout
 
 ```
@@ -121,7 +144,7 @@ web/src/            React app: pages/, types.ts (mirrors models.py), fixtures/ (
 bifrost/            Bifrost config.json
 docs/               PRD and hackathon context
 Dockerfile          one image: builds web/, FastAPI serves it + the API on port 8000
-docker-compose.yml  app + Bifrost
+docker-compose.yml  app + Bifrost, assay.db in a volume
 ```
 
 ## Methodology
