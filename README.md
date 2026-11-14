@@ -73,7 +73,7 @@ A run's step-by-step trace is built from the two places every research agent mus
 | Frontend | React, Vite, TypeScript, Tailwind CSS, shadcn/ui, Recharts |
 | Live updates | Server-Sent Events |
 | Models | Open models (Llama family) on free tiers for agents. An OpenAI GPT model as the judge |
-| Deploy | One Docker image (Hugging Face Space) |
+| Deploy | One Docker image (`docker compose up`; Hugging Face Docker Spaces need PRO, see Deploy) |
 
 ## Getting started
 
@@ -120,7 +120,7 @@ One image runs everywhere. Keys and `RUN_PASSCODE` come from env only. The image
 - **`docker compose up`:** app + a separate Bifrost service. `assay.db` lives in the `assay-state` volume, so runs survive `docker compose down` and rebuilds (`down -v` wipes them).
 - **Single container (Hugging Face Space):** with no `BIFROST_URL` set, the image starts its bundled Bifrost on `127.0.0.1:8080`, so only the app port faces the internet. Each batch starts its own mitmproxy search proxy on localhost, as it does locally.
 
-**Hugging Face Space (Docker SDK):**
+**Status: not deployed.** Hugging Face now requires a PRO subscription for Docker Spaces on free CPU (creating one returned `402 Payment Required` on Nov 14, 2026). The demo runs from a laptop (fallback below). The image already runs as a single container, so with PRO the steps are:
 
 1. Create a Space with the Docker SDK.
 2. In Space settings → Secrets, add every name from `.env.example` that has a value in your `.env`. Leave `BIFROST_URL` unset.
@@ -134,7 +134,7 @@ HF_TOKEN=... uvx --from huggingface_hub hf upload <user>/<space> /tmp/space . --
 
 The free Space disk is not persistent: a restart clears `assay.db` and Bifrost's logs. The leaderboard falls back to the committed fixtures until a benchmark exists.
 
-**Fallback if the Space fails on judging day (PRD §12):** run `docker compose up` on a laptop and demo at http://localhost:8000, with the recorded video as backup. One batch runs at a time, and the Run button needs `RUN_PASSCODE`.
+**Laptop fallback (PRD §12), the current demo setup:** run `docker compose up --build` on a laptop and demo at http://localhost:8000, with the recorded video as backup. One batch runs at a time, and the Run button needs `RUN_PASSCODE`.
 
 ## Repository layout
 
