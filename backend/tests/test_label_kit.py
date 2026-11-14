@@ -57,7 +57,7 @@ def db(tmp_path, monkeypatch):
 def test_sample_is_blind_and_spread(db):
     rows = label_kit.sample()
     assert len(rows) == 50 and len({r["id"] for r in rows}) == 50
-    assert all(set(r) == {"id", "text", "output", "pool", "human"} and r["human"] == "" for r in rows)
+    assert all(set(r) == {"id", "text", "output", "pool", "trap", "human"} and r["human"] == "" for r in rows)
     assert "verdict" not in json.dumps(rows) and "source_quote" not in json.dumps(rows)
     picked = [(db[r["id"].rsplit(":", 1)[0]], int(r["id"].rsplit(":", 1)[1])) for r in rows]
     assert {rec.agent_id for rec, _ in picked} == set(AGENTS)
@@ -67,7 +67,7 @@ def test_sample_is_blind_and_spread(db):
     verdicts = [rec.claims[i].verdict for rec, i in picked]
     assert verdicts.count("trap") >= 5 and verdicts.count("not_found") >= 5
     for (rec, i), row in zip(picked, rows):
-        assert row["text"] == rec.claims[i].text and row["output"] == rec.output.text
+        assert row["text"] == rec.claims[i].text and row["output"] == rec.output.text and row["trap"] == rec.trap
         assert row["pool"] == {"docs": cited(rec.task_id)}  # whole cited docs, nothing else from the pool
 
 
@@ -93,8 +93,11 @@ def test_split_merge_round_trips_into_evaluate(db, tmp_path, monkeypatch):
     assert [r["id"] for r in merged] == [r["id"] for r in json.loads(out.read_text("utf-8"))]
     by_output = {r.output.text: r.claims for r in db.values()}
     # only the live judge LLM is stubbed: the real judge_claims checks quotes against the cited pool
-    monkeypatch.setattr(judge_agreement, "judge_claims", lambda output, pool: graders.judge_claims(
-        output, pool, lambda prompt: json.dumps([c.model_dump() for c in by_output[output]])))
+    # the stub LLM never says "trap": only the real trap override, fed the row's trap, can match the human label
+    llm = lambda output: json.dumps([{**c.model_dump(), "verdict": "unsupported" if c.verdict == "trap" else c.verdict}
+                                     for c in by_output[output]])
+    monkeypatch.setattr(judge_agreement, "judge_claims", lambda output, pool, trap=None: graders.judge_claims(
+        output, pool, lambda prompt: llm(output), trap))
     assert judge_agreement.evaluate(merged)["agreement_pct"] == 100
 
 

@@ -42,7 +42,8 @@ def sample(seed: int = 0) -> list[dict]:
     for r, i, c in picked:
         cited = _cited_urls(r.output.text)
         rows.append({"id": f"{r.id}:{i}", "text": c.text, "output": r.output.text,
-                     "pool": {"docs": [d for d in pools[r.task_id]["docs"] if d["url"] in cited]}, "human": ""})
+                     "pool": {"docs": [d for d in pools[r.task_id]["docs"] if d["url"] in cited]},
+                     "trap": r.trap, "human": ""})
     return rows
 
 
