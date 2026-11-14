@@ -14,9 +14,9 @@ services:
       - bifrost
 
   bifrost:
-    image: maximhq/bifrost
+    image: maximhq/bifrost@sha256:b5258c5f11c79064fc8280e49513f54c0b1da81c78bd11d3b4c1f62f8926d1ab  # same digest as the Dockerfile's bundled copy
     ports:
-      - "8080:8080"
+      - "127.0.0.1:8080:8080"  # dashboard + admin API: localhost only, never the venue Wi-Fi
     volumes:
       - ./bifrost:/app/data  # config.json in, Bifrost's SQLite stores out (gitignored)
     env_file:

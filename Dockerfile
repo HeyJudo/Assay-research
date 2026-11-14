@@ -15,7 +15,7 @@ COPY data /app/data
 COPY web/src/fixtures /app/web/src/fixtures
 COPY --from=web /app/web/dist /app/web/dist
 # Bundled Bifrost (static Go binary) for single-container hosts like Hugging Face Spaces. config.json holds env.* refs only.
-COPY --from=maximhq/bifrost /app/main /usr/local/bin/bifrost
+COPY --from=maximhq/bifrost@sha256:b5258c5f11c79064fc8280e49513f54c0b1da81c78bd11d3b4c1f62f8926d1ab /app/main /usr/local/bin/bifrost
 COPY bifrost/config.json /app/bifrost/config.json
 # Venv first on PATH: agents' `#!/usr/bin/env python3` must find gpt-researcher and mitmproxy, and the runner passes PATH to them.
 # ASSAY_DB sits in /app/state so compose can mount a volume there. uid 1000 owns it: Hugging Face Spaces run as that user.

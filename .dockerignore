@@ -8,3 +8,4 @@ bifrost/*
 !bifrost/config.json
 **/*.db
 **/.pytest_cache
+data/labels
