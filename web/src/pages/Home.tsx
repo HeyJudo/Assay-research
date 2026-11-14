@@ -14,8 +14,8 @@ export default function Home() {
   const [rows, runs] = query.value
   const ranked = rankRows(rows, defaultWeights)
   const top = ranked[0]
-  const cheap = [...rows].sort((a, b) => a.cost_per_correct - b.cost_per_correct)[0]
-  const honest = [...rows].sort((a, b) => b.honesty - a.honesty)[0]
+  const cheap = rows.filter(r => r.cost_per_correct != null).sort((a, b) => a.cost_per_correct! - b.cost_per_correct!)[0]
+  const honest = rows.filter(r => r.honesty != null).sort((a, b) => b.honesty! - a.honesty!)[0]
   return <><Heading eyebrow="THE RESEARCH AGENT BENCHMARK" title="Research agent benchmark" description="Find the right research agent. See what it gets right, what it costs, and where it breaks." action={<Button asChild><Link to="/run"><Play size={15} />Run a benchmark</Link></Button>} />
     <div className="section-label"><h2>Accuracy, cost, and honesty</h2><span>{sampleData ? 'Illustrative fixture findings' : 'Benchmark findings'}</span></div>
     <div className="insight-grid">{top && <Link className="insight-card" to={`/compare?a=${top.agent_id}`}><span className="insight-icon green"><ShieldCheck size={19} /></span><p>Best fit with default priorities</p><h3>{agentLabel(top.agent_id)}</h3><small>{percent(top.trap_resistance)} trap resistance {sampleData ? 'in sample data' : 'in benchmark results'} <ArrowRight size={14} /></small></Link>}{cheap && <Link className="insight-card" to={`/compare?a=${cheap.agent_id}`}><span className="insight-icon amber"><Target size={19} /></span><p>Lowest cost per correct</p><h3>{money(cheap.cost_per_correct)}</h3><small>{agentLabel(cheap.agent_id)} <ArrowRight size={14} /></small></Link>}{honest && <Link className="insight-card" to={`/compare?a=${honest.agent_id}`}><span className="insight-icon violet"><Sparkles size={19} /></span><p>Highest honesty</p><h3>{percent(honest.honesty)} honesty</h3><small>Includes correct abstention and over-refusal <ArrowRight size={14} /></small></Link>}</div>
