@@ -243,8 +243,10 @@ def fetch_usage(bifrost_url: str, vk_id: str, since: str) -> list[dict]:
 
 def start_batch(batch_id: str, agent_ids: list[str], task: Task, trap, *, emit, bifrost_url: str,
                 vks: list[str], timeout_s: float = 600,
-                judge: Callable[[str], str] = graders._judge_http) -> threading.Thread:
+                judge: Callable[[str], str] = graders._judge_http,
+                jobs: list[tuple[str, int]] | None = None) -> threading.Thread:
     """Run each agent REPEATS times on task, all runs in parallel. Run slot n gets vks[n-1] as its Bifrost key.
+    jobs, (agent id, repeat) pairs, runs only those repeats: the benchmark CLI resumes with it.
 
     Starts the batch's search proxy (task pool + trap) and, for model_outage, the outage pass-through, then
     returns the thread running the batch. emit(name, event) gets the SSE events from PRD §8, batch_done last.
@@ -255,7 +257,10 @@ def start_batch(batch_id: str, agent_ids: list[str], task: Task, trap, *, emit, 
             raise ValueError(f"unknown agent {a}")
         if not all(found[1].get(k) for k in ("version", "models", "prompt_hash")):
             raise ValueError(f"{a}/agent.json needs version, models and prompt_hash")
-    jobs = [(a, r) for a in agent_ids for r in range(1, REPEATS + 1)]
+    if jobs is None:
+        jobs = [(a, r) for a in agent_ids for r in range(1, REPEATS + 1)]
+    if not jobs or any(a not in agents or r not in range(1, REPEATS + 1) for a, r in jobs):
+        raise ValueError(f"jobs must be (agent in {agent_ids}, repeat 1..{REPEATS})")
     if len(vks) < len(jobs) or not all(vks[:len(jobs)]):
         raise ValueError(f"set BIFROST_RUN_VK_1..{len(jobs)}: one Bifrost key per parallel run")
     pool_file = find_pool(task.id)
