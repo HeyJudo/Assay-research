@@ -157,3 +157,10 @@ input:not([type="range"]):not([type="checkbox"]),select { background:var(--card)
 @media(max-width:680px) { .sidebar { width:100%; }.main-shell { margin:0; }main { padding-top:28px; }h1 { font-size:32px; }.insight-card { padding:18px; }.insight-card h3 { font-size:22px; } }
 
 [data-slot="button"][data-variant="default"] { color: var(--primary-foreground); }
+
+/* Light-theme fixes: older rules used --border, --secondary and --chart-2 as text colors, which only worked on the dark palette. */
+.slash, .workspace-label span, .preset-item>svg, .page-footer, .footer-dot { color: var(--muted-foreground); }
+.launcher-version span { color: var(--muted-foreground); font-size: 9px; }
+.page-footer { border-color: var(--border); }
+label, .compare-table td { color: var(--muted-foreground); }
+[data-slot="table-cell"], .recent-list strong, .agent-option, .preset-item { color: var(--foreground); }
