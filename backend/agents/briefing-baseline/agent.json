@@ -1,1 +1,1 @@
-{"version":"1.0","models":["qwen3.8-27b"],"prompt_hash":"d7c88a72"}
+{"version":"1.0","models":["qwen3.8-27b"],"prompt_hash":"d7c88a72","name":"Briefing Agent: Baseline","kind":"ours","description":"One main model searches, reads and writes the brief."}

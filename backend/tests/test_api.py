@@ -3,7 +3,7 @@ import json
 import pytest
 from fastapi.testclient import TestClient
 
-from assay import judge_agreement, store
+from assay import judge_agreement, runner, store
 from assay.api import app
 from assay.store import FIXTURE
 
@@ -121,3 +121,29 @@ def test_judge_agreement_saved_by_script(client, tmp_path, monkeypatch):
     judge_agreement.main()
     assert client.get("/api/judge-agreement").json() == {
         "agreement_pct": 98, "claims": 50, "matches": 49, "disagreements": {"trap->supported": 1}}
+
+
+def test_agents_are_the_real_agent_folders_without_stub(client):
+    body = client.get("/api/agents").json()
+    assert [a["id"] for a in body] == ["briefing-baseline", "briefing-cheap-first", "briefing-evidence-gated",
+                                       "gpt-researcher"]
+    assert {a["id"]: a["kind"] for a in body}["gpt-researcher"] == "outside"
+    assert all(a["name"] and a["description"] for a in body)
+
+
+def test_agents_read_agent_json(client, tmp_path, monkeypatch):
+    monkeypatch.setattr(runner, "AGENTS_DIR", tmp_path)
+    for name in ("x", "stub"):
+        (tmp_path / name).mkdir()
+        (tmp_path / name / "run").write_text("")
+        (tmp_path / name / "agent.json").write_text(json.dumps(
+            {"version": "1", "models": ["m"], "prompt_hash": "p", "name": name.upper(), "kind": "outside",
+             "description": "d"}))
+    assert client.get("/api/agents").json() == [{"id": "x", "name": "X", "kind": "outside", "description": "d"}]
+
+
+def test_tasks_are_the_benchmark_suite_without_practice(client):
+    body = client.get("/api/tasks").json()
+    assert len(body) == 16 and not any(t["id"].startswith("practice") for t in body)
+    hinton = next(t for t in body if t["id"] == "fact-hinton-university-trap")
+    assert (hinton["type"], hinton["answer"]) == ("fact", "1582")  # from data/tasks/fact-hinton-university-trap.json
