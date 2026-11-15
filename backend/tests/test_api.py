@@ -8,6 +8,8 @@ from fastapi.testclient import TestClient
 
 from assay import api, judge_agreement, runner, store
 from assay.api import app
+from assay.leaderboard import aggregate
+from assay.models import RunRecord
 from assay.store import FIXTURE
 
 FIXTURE_IDS = ["run_001", "run_002", "run_003", "run_004"]
@@ -17,6 +19,7 @@ FIXTURE_IDS = ["run_001", "run_002", "run_003", "run_004"]
 def client(tmp_path, monkeypatch):
     monkeypatch.setenv("ASSAY_DB", str(tmp_path / "t.db"))
     monkeypatch.setenv("ASSAY_SEED_FIXTURES", "1")
+    monkeypatch.setattr(api, "BENCH_RESULTS", tmp_path / "missing_bench_runs.json")
     with TestClient(app) as c:
         yield c
 
@@ -26,6 +29,19 @@ def test_no_seed_by_default(tmp_path, monkeypatch):
     monkeypatch.delenv("ASSAY_SEED_FIXTURES", raising=False)
     with TestClient(app) as c:
         assert c.get("/api/runs").json() == []
+
+
+def test_empty_db_leaderboard_aggregates_published_benchmark_runs(tmp_path, monkeypatch):
+    monkeypatch.setenv("ASSAY_DB", str(tmp_path / "empty.db"))
+    monkeypatch.delenv("ASSAY_SEED_FIXTURES", raising=False)
+    records = [RunRecord.model_validate(r) for r in json.loads(
+        (api.ROOT / "data" / "results" / "bench_runs.json").read_text("utf-8"))]
+    expected = [aggregate(records, agent).model_dump() for agent in sorted({r.agent_id for r in records})]
+    with TestClient(app) as c:
+        assert c.get("/api/leaderboard").json() == expected
+        comparison = c.get("/api/compare", params={"a": expected[0]["agent_id"], "b": expected[-1]["agent_id"]})
+        assert comparison.json() == {"scope": "full", "a": expected[0], "b": expected[-1]}
+    assert store.list_runs() == []
 
 
 def test_list_seeded_without_steps(client):
