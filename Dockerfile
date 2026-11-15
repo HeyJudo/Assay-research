@@ -5,6 +5,8 @@ RUN npm ci
 COPY web/ ./
 # The built app talks to the real API (same origin). Without this it builds in demo mode and fakes runs.
 ENV VITE_DATA_MODE=api
+# Results are real benchmark runs (bench_ batches in SQLite), so the UI stops labeling them as samples.
+ENV VITE_RESULTS_ARE_FIXTURES=false
 RUN npm run build
 
 FROM python:3.12-slim
