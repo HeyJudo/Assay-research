@@ -37,8 +37,8 @@
           "name": "gemini-1",
           "value": "env.GEMINI_API_KEY",
           "models": [
-            "gemini-3.5-flash",
-            "gemini-3.5-flash-lite"
+            "gemini-3.5-flash-lite",
+            "gemini-3.1-flash-lite"
           ],
           "weight": 1.0
         }
@@ -102,8 +102,8 @@
           {
             "provider": "gemini",
             "allowed_models": [
-              "gemini-3.5-flash",
-              "gemini-3.5-flash-lite"
+              "gemini-3.5-flash-lite",
+              "gemini-3.1-flash-lite"
             ],
             "key_ids": [
               "*"
@@ -121,8 +121,8 @@
           {
             "provider": "gemini",
             "allowed_models": [
-              "gemini-3.5-flash",
-              "gemini-3.5-flash-lite"
+              "gemini-3.5-flash-lite",
+              "gemini-3.1-flash-lite"
             ],
             "key_ids": [
               "*"
@@ -140,8 +140,8 @@
           {
             "provider": "gemini",
             "allowed_models": [
-              "gemini-3.5-flash",
-              "gemini-3.5-flash-lite"
+              "gemini-3.5-flash-lite",
+              "gemini-3.1-flash-lite"
             ],
             "key_ids": [
               "*"
@@ -159,8 +159,8 @@
           {
             "provider": "gemini",
             "allowed_models": [
-              "gemini-3.5-flash",
-              "gemini-3.5-flash-lite"
+              "gemini-3.5-flash-lite",
+              "gemini-3.1-flash-lite"
             ],
             "key_ids": [
               "*"
@@ -178,8 +178,8 @@
           {
             "provider": "gemini",
             "allowed_models": [
-              "gemini-3.5-flash",
-              "gemini-3.5-flash-lite"
+              "gemini-3.5-flash-lite",
+              "gemini-3.1-flash-lite"
             ],
             "key_ids": [
               "*"
@@ -197,8 +197,8 @@
           {
             "provider": "gemini",
             "allowed_models": [
-              "gemini-3.5-flash",
-              "gemini-3.5-flash-lite"
+              "gemini-3.5-flash-lite",
+              "gemini-3.1-flash-lite"
             ],
             "key_ids": [
               "*"
@@ -216,8 +216,8 @@
           {
             "provider": "gemini",
             "allowed_models": [
-              "gemini-3.5-flash",
-              "gemini-3.5-flash-lite"
+              "gemini-3.5-flash-lite",
+              "gemini-3.1-flash-lite"
             ],
             "key_ids": [
               "*"
@@ -235,8 +235,8 @@
           {
             "provider": "gemini",
             "allowed_models": [
-              "gemini-3.5-flash",
-              "gemini-3.5-flash-lite"
+              "gemini-3.5-flash-lite",
+              "gemini-3.1-flash-lite"
             ],
             "key_ids": [
               "*"
@@ -254,8 +254,8 @@
           {
             "provider": "gemini",
             "allowed_models": [
-              "gemini-3.5-flash",
-              "gemini-3.5-flash-lite"
+              "gemini-3.5-flash-lite",
+              "gemini-3.1-flash-lite"
             ],
             "key_ids": [
               "*"

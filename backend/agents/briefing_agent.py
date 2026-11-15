@@ -11,8 +11,8 @@ import urllib.request
 from datetime import date
 from pathlib import Path
 
-MAIN_MODEL = "gemini-3.5-flash"
-SMALL_MODEL = "gemini-3.5-flash-lite"
+MAIN_MODEL = "gemini-3.5-flash-lite"
+SMALL_MODEL = "gemini-3.1-flash-lite"
 SECTIONS = ("Verified", "Uncertain", "Not found", "Open questions")
 URL_RE = re.compile(r"https?://[^\s)>\]]+")
 def prompt_hash(version: str) -> str:

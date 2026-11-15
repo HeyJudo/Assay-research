@@ -1,1 +1,1 @@
-{"version":"1.0","models":["gemini-3.5-flash"],"prompt_hash":"48df698d","name":"Briefing Agent: Evidence-gated","kind":"ours","description":"Checks each claim against its cited passage. Unsupported claims move to Not found or Uncertain."}
+{"version":"1.0","models":["gemini-3.5-flash-lite"],"prompt_hash":"dfd7c545","name":"Briefing Agent: Evidence-gated","kind":"ours","description":"Checks each claim against its cited passage. Unsupported claims move to Not found or Uncertain."}

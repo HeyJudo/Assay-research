@@ -1,1 +1,1 @@
-{"version":"1.0","models":["gemini-3.5-flash"],"prompt_hash":"c20757ac","name":"Briefing Agent: Baseline","kind":"ours","description":"One main model searches, reads and writes the brief."}
+{"version":"1.0","models":["gemini-3.5-flash-lite"],"prompt_hash":"34271529","name":"Briefing Agent: Baseline","kind":"ours","description":"One main model searches, reads and writes the brief."}

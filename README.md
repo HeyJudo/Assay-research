@@ -72,7 +72,7 @@ A run's step-by-step trace is built from the two places every research agent mus
 | Gateway | Bifrost (Docker / npx) |
 | Frontend | React, Vite, TypeScript, Tailwind CSS, shadcn/ui, Recharts |
 | Live updates | Server-Sent Events |
-| Models | Gemini 3.5 Flash and Flash-Lite (Google AI Studio free tier) for agents. An OpenAI GPT model as the judge |
+| Models | Gemini 3.5 Flash-Lite and 3.1 Flash-Lite (Google AI Studio free tier) for agents. An OpenAI GPT model as the judge |
 | Deploy | One Docker image (`docker compose up`; Hugging Face Docker Spaces need PRO, see Deploy) |
 
 ## Getting started

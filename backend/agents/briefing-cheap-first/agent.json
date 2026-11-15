@@ -1,1 +1,1 @@
-{"version":"1.0","models":["gemini-3.5-flash-lite","gemini-3.5-flash"],"prompt_hash":"3f95a809","name":"Briefing Agent: Cheap-first","kind":"ours","description":"Starts on the small model, switches to the main model when a fixed rule fires."}
+{"version":"1.0","models":["gemini-3.1-flash-lite","gemini-3.5-flash-lite"],"prompt_hash":"5f3adfcc","name":"Briefing Agent: Cheap-first","kind":"ours","description":"Starts on the small model, switches to the main model when a fixed rule fires."}

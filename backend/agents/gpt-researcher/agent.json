@@ -1,1 +1,1 @@
-{"version": "0.17.0", "models": ["gemini-3.5-flash"], "prompt_hash": "gpt-researcher-0.17.0-reduced-depth", "name": "GPT Researcher", "kind": "outside", "description": "Open-source research agent, run unchanged through a wrapper (reduced-depth config)."}
+{"version": "0.17.0", "models": ["gemini-3.5-flash-lite"], "prompt_hash": "gpt-researcher-0.17.0-reduced-depth", "name": "GPT Researcher", "kind": "outside", "description": "Open-source research agent, run unchanged through a wrapper (reduced-depth config)."}

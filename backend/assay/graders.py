@@ -177,7 +177,7 @@ def grade_run(run: RunRecord, task: Task, pool: dict, usage: list[dict],
         tokens=tokens, cost_usd=cost, cost_by_model=by_model,
         switched=any(step.kind == "switch" for step in run.steps) or
                  (run.agent_id == "briefing-cheap-first" and any(
-                     a == "gemini-3.5-flash-lite" and b == "gemini-3.5-flash"
+                     a == "gemini-3.1-flash-lite" and b == "gemini-3.5-flash-lite"
                      for a, b in zip(llm_models, llm_models[1:]))), trap_fell=fell,
         abstention=abstention, claims_supported_pct=supported_pct,
     )
