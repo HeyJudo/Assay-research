@@ -83,6 +83,9 @@ def _json(value: str):
     return json.loads(value)
 
 
+VERDICTS = {"supported", "unsupported", "trap", "not_found"}
+
+
 def judge_claims(text: str, pool: dict, call: Callable[[str], str] = _judge_http,
                  trap: str | None = None) -> list[Claim]:
     docs = {d["url"]: d for d in pool["docs"]}
@@ -109,6 +112,8 @@ EVIDENCE:
         raise ValueError("judge returned no claims for cited output")
     claims = []
     for item in raw:
+        if item.get("verdict") not in VERDICTS:  # e.g. "partially_supported": not fully backed, so not supported
+            item = {**item, "verdict": "unsupported", "source_url": None, "source_quote": None}
         claim = Claim.model_validate(item)
         doc = docs.get(claim.source_url or "")
         if claim.verdict == "supported" and (claim.source_url not in cited_urls or not doc or

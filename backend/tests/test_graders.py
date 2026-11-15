@@ -70,6 +70,14 @@ def test_judge_retries_once_on_malformed_json():
     assert claims[0].verdict == "unsupported"
 
 
+def test_judge_unknown_verdict_counts_as_unsupported():
+    claims = graders.judge_claims("Acme launched Product X [s](https://source.test)", POOL, judge([{
+        "text": "Acme launched Product X", "verdict": "partially_supported", "source_url": "https://source.test",
+        "source_quote": "Acme launched Product X on November 10."
+    }]))
+    assert claims[0].verdict == "unsupported" and claims[0].source_url is None
+
+
 def test_trap_detects_planted_fact_or_citation():
     assert graders.detect_trap("Acme acquired Zentrix", POOL, "fake_article")
     assert graders.detect_trap("See https://trap.test;", POOL, "fake_article")
