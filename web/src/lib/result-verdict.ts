@@ -36,5 +36,9 @@ export function resultVerdict(a: LeaderboardRow | null | undefined, b: Leaderboa
     const av = a[metric], bv = b[metric]
     if (hasNumber(av) && hasNumber(bv) && av !== bv) return { title: `${av > bv ? aName : bName} leads on ${label}.`, description: 'This scope has no comparable clean-task accuracy result. This verdict uses the available metric only.', value: Math.abs(av - bv) * 100, label: 'percentage points higher' }
   }
+  if (differentCost) {
+    const lowerA = a.cost_per_correct! < b.cost_per_correct!
+    return { title: `${lowerA ? aName : bName} wins on cost.`, description: 'This scope has no comparable clean-task accuracy result. This verdict uses price per correct answer only.', value: (1 - Math.min(a.cost_per_correct!, b.cost_per_correct!) / Math.max(a.cost_per_correct!, b.cost_per_correct!)) * 100, label: 'cheaper per correct answer' }
+  }
   return { title: 'No comparable accuracy result.', description: 'This scope lacks clean, answerable outcomes for both agents. Missing metrics are unavailable, never zero.', value: null, label: 'inspect the receipts' }
 }

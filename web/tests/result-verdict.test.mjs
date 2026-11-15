@@ -35,3 +35,10 @@ test('one-agent results do not invent a comparison', () => {
   assert.equal(verdict.value, 75)
   assert.ok(verdict.description.includes('one agent'))
 })
+
+test('trap-only batch falls back to a cost verdict when trap resistance ties', () => {
+  const trapOnly = overrides => row({ accuracy: NaN, accuracy_low: null, accuracy_high: null, trap_resistance: .67, honesty: NaN, ...overrides })
+  const verdict = resultVerdict(trapOnly({ cost_per_correct: .0018 }), trapOnly({ cost_per_correct: .0032 }), 'Baseline', 'Cheap-first')
+  assert.equal(verdict.title, 'Baseline wins on cost.')
+  assert.equal(Math.round(verdict.value), 44)
+})
