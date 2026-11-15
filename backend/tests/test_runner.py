@@ -206,6 +206,12 @@ def test_literal_agent_key_redacted(tmp_path):
     assert "[redacted]" in rec.steps[0].detail
 
 
+def test_home_path_hidden_in_stderr(tmp_path):
+    home = str(Path.home())
+    rec = runner.run_once(make_agent(tmp_path, f"sys.stderr.write({home + '/x.py'!r})\nsys.exit(1)\n"), TASK, **CFG)
+    assert home not in rec.steps[0].detail and "~" in rec.steps[0].detail
+
+
 def test_empty_model_name_rejected():
     with pytest.raises(ValueError):
         runner.run_once(STUB, TASK, **{**CFG, "models": ["a", ""]})

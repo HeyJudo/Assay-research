@@ -56,8 +56,9 @@ function ReceiptPaper({ id }: { id: string }) {
   if (!query.value) return <LoadState error={query.error} retry={query.retry} />
   const [, initialRun, tasks] = query.value
   const run = currentRun ?? initialRun
-  const passed = run.status === 'done' && run.metrics.success
-  const outcome = run.status === 'running' ? 'Running' : run.status === 'error' ? 'Error' : run.status === 'budget_exceeded' ? 'Budget exceeded' : passed ? 'Passed' : 'Failed'
+  const brief = run.task_id === 'brief-live'  // live briefs are one-off and never graded
+  const passed = run.status === 'done' && (brief || run.metrics.success)
+  const outcome = run.status === 'running' ? 'Running' : run.status === 'error' ? 'Error' : run.status === 'budget_exceeded' ? 'Budget exceeded' : brief ? 'Done' : passed ? 'Passed' : 'Failed'
   const supported = run.claims.filter(claim => claim.verdict === 'supported').length
   const task = tasks.find(task => task.id === run.task_id)
   const phaseCosts = run.steps.reduce<Record<string, number>>((groups, step) => { groups[step.phase] = (groups[step.phase] ?? 0) + step.cost_usd; return groups }, {})
@@ -74,7 +75,7 @@ function ReceiptPaper({ id }: { id: string }) {
           <motion.header className="receipt-paper-heading" {...row}><ReceiptText size={28} aria-hidden="true" /><div>ASSAY</div><p>{run.id}</p><time dateTime={run.started_at}>{Number.isNaN(Date.parse(run.started_at)) ? run.started_at : new Date(run.started_at).toISOString().replace('T', ' ').replace(/\.\d+Z$/, ' UTC')}</time></motion.header>
           <motion.section className="receipt-print-section" {...row}>
             <motion.div className="receipt-line" {...row}><span className="receipt-label">AGENT</span><i /><strong>{agentLabel(run.agent_id)} v{run.config.agent_version}</strong></motion.div>
-            <motion.div className="receipt-line" {...row}><span className="receipt-label">REPEAT</span><i /><span>{run.repeat} of 3</span></motion.div>
+            {!brief && <motion.div className="receipt-line" {...row}><span className="receipt-label">REPEAT</span><i /><span>{run.repeat} of 3</span></motion.div>}
             <motion.div className="receipt-line" {...row}><span className="receipt-label">RESULT</span><i /><strong className={passed ? 'receipt-good' : 'receipt-bad'}>{outcome}</strong></motion.div>
             <p className="receipt-task">{task?.prompt ?? run.task_id}</p>
             {run.metrics.trap_fell && <p className="receipt-bad">Fell for the planted trap.</p>}

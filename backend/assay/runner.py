@@ -167,6 +167,7 @@ def run_once(agent_dir: Path, task: Task, *, agent_version: str, models: list[st
             if p.returncode != 0:
                 if openai_api_key:
                     stderr = stderr.replace(openai_api_key, "[redacted]")
+                stderr = stderr.replace(str(Path.home()), "~")  # tracebacks name the host user, receipts are public
                 error = f"exit {p.returncode}: {KEY_RE.sub('[redacted]', stderr)[-500:]}"
             elif not out.exists():
                 error = "no output file"
