@@ -116,8 +116,8 @@ export default function Receipt() {
 
 function FragmentWithReceipt({ id, reduced, close, captureOpener, restoreFocus }: { id: string; reduced: boolean; close: () => void; captureOpener: () => void; restoreFocus: () => void }) {
   return <>
-    <Dialog.Overlay forceMount asChild><motion.div className="receipt-scrim" initial={reduced ? false : { opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: reduced ? 0 : .2 }} onClick={close} /></Dialog.Overlay>
-    <Dialog.Content forceMount asChild onOpenAutoFocus={captureOpener} onCloseAutoFocus={event => { event.preventDefault(); restoreFocus() }}><motion.aside className="receipt-sheet" initial={reduced ? false : { x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }} transition={reduced ? { duration: 0 } : spring}>
+    <Dialog.Overlay forceMount asChild><motion.div className="receipt-scrim" initial={reduced ? false : { opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0, pointerEvents: 'none' }} transition={{ duration: reduced ? 0 : .2 }} onClick={close} /></Dialog.Overlay>
+    <Dialog.Content forceMount asChild onOpenAutoFocus={captureOpener} onCloseAutoFocus={event => { event.preventDefault(); restoreFocus() }}><motion.aside className="receipt-sheet" initial={reduced ? false : { x: '100%' }} animate={{ x: 0 }} exit={{ x: reduced ? 0 : '100%', opacity: reduced ? 0 : 1, pointerEvents: 'none' }} transition={reduced ? { duration: 0 } : spring}>
       <div className="receipt-sheet-header"><SheetTitle>Run receipt</SheetTitle><SheetClose asChild><Button variant="ghost" size="icon" aria-label="Close receipt"><X size={20} /></Button></SheetClose></div><SheetDescription className="sr-only">Every recorded step, cost, claim verdict and source for this research run.</SheetDescription><ReceiptPaper id={id} />
     </motion.aside></Dialog.Content>
   </>
