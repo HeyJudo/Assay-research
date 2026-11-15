@@ -2,7 +2,7 @@
 
 **Know which research agent to trust, and why.**
 
-Assay is a benchmarking platform for AI research agents. It runs several agents on the same tasks, against the same frozen copy of the web, with planted traps, three times each. Then it checks every claim against its cited source and ranks the agents by what matters to you: accuracy, reliability, cost, trap resistance and honesty.
+Assay is a benchmarking platform for AI research agents. It runs several agents on the same tasks, against the same frozen copy of the web, with planted traps, three times each. For completed briefing tasks, the judge checks claims against their cited sources. Assay ranks the agents by what matters to you: accuracy, reliability, cost, trap resistance and honesty.
 
 > **Status:** in active development for the [Global AI Hackathon 2026](https://hackculture.io/hackathons/ai-global-hackathon) (build window Nov 1–15). Spec is final. Code lands from Nov 9. Sections marked _(planned)_ describe the target and will be replaced with real instructions as each part ships.
 
@@ -27,8 +27,8 @@ Full evidence and sources: [`docs/PRD.md`](docs/PRD.md#why-it-matters-evidence-f
 - **Frozen web.** Each task gets a fixed pool of real documents, collected once with Tavily. Every agent searches and reads only that pool, so runs are repeatable.
 - **Plug in any agent with env vars only.** Its model calls go through Bifrost and its web traffic through the Assay search proxy. No code changes to the agent.
 - **Traps.** Fake article, hidden instruction, search outage, model outage. Planted identically for every agent, each with a clean twin as the baseline.
-- **Claim-by-claim citation check.** A judge from a different model family marks every claim supported, unsupported, trap or not found, with the exact source quote.
-- **Reliability, cost and honesty.** Every task runs 3×. We report pass^3, cost per correct answer, and whether agents say "Not found" when the answer truly isn't there.
+- **Claim-by-claim citation check.** For completed briefing tasks only, a judge from a different model family marks claims supported, unsupported, trap or not found, with the exact source quote.
+- **Reliability, cost and honesty.** The benchmark runs 11 of the 16 tasks (4 trapped twins, 4 clean twins, 3 unanswerable) × 3 repeats × 4 agents. We report pass^3, cost per correct answer, and whether agents say "Not found" when the answer truly isn't there.
 - **Explains why.** Our Briefing Agent comes in three versions that differ in one design choice each (Baseline, Cheap-first, Evidence-gated). Assay measures what each choice changes.
 
 ## Screens
@@ -53,14 +53,14 @@ React app ──HTTP/SSE──► FastAPI ──► SQLite
              Bifrost gateway   Search proxy (mitmproxy)
              all LLM calls,    serves the frozen pool,
              cost, budgets,    injects traps,
-             fallbacks         logs every search
+             run tags          logs every search
 ```
 
 A run's step-by-step trace is built from the two places every research agent must pass through: Bifrost (model calls) and the search proxy (web access). That is what makes Assay framework-independent.
 
 ## How we use the sponsors
 
-- **Bifrost:** gateway for every model call from every agent and the judge. Token and cost logs per model, virtual keys with budgets, load balancing across free-tier keys, provider fallback, and simulated model outages for failure tests.
+- **Bifrost:** gateway for every model call from every agent and the judge. Uses virtual-key budgets and per-run tagging for usage collection, plus simulated model outages for failure tests. Agents use one provider, Google AI Studio Gemini, so there is no provider failover in practice. The judge uses OpenAI.
 - **Tavily:** builds every frozen document pool (search + extract). Powers the live Briefing Agent. The proxy speaks Tavily's API format, so agents written for Tavily run on Assay unchanged.
 
 ## Tech stack
@@ -77,9 +77,17 @@ A run's step-by-step trace is built from the two places every research agent mus
 
 ## Getting started
 
-Prerequisites: Docker Desktop (full stack), or Node 20.19+ + Python 3.12 + [uv](https://docs.astral.sh/uv/) to run parts separately. API keys: Tavily, OpenAI (judge), and at least one free provider (Groq, OpenRouter, Gemini or Cerebras).
+Prerequisites: Docker Desktop (full stack), or Node 20.19+ + Python 3.12 + [uv](https://docs.astral.sh/uv/) to run parts separately. API keys: Tavily, OpenAI (judge), and Google AI Studio Gemini (required for agents).
 
-The API currently serves fake run records from `web/src/fixtures/`. The runner, SQLite and live endpoints come next.
+The API reads run records from SQLite. The runner and live batch, SSE and briefing endpoints are implemented. Set `ASSAY_SEED_FIXTURES=1` to load fixture runs into an empty database for frontend work.
+
+Set these names in `.env`:
+
+- Provider keys: `TAVILY_API_KEY`, `GEMINI_API_KEY`, `OPENAI_API_KEY`.
+- Run-slot virtual keys: `BIFROST_RUN_VK_1`, `BIFROST_RUN_VK_2`, `BIFROST_RUN_VK_3`, `BIFROST_RUN_VK_4`, `BIFROST_RUN_VK_5`, `BIFROST_RUN_VK_6`, `BIFROST_RUN_VK_7`, `BIFROST_RUN_VK_8`, `BIFROST_RUN_VK_9`.
+- Judge: `BIFROST_JUDGE_VK`, `ASSAY_JUDGE_MODEL`.
+- Bifrost admin: `BIFROST_SETUP_TOKEN`, `BIFROST_ADMIN_USER`, `BIFROST_ADMIN_PASSWORD`.
+- Live Run access: `RUN_PASSCODE`.
 
 **Full stack** (app + API at http://localhost:8000, Bifrost UI at http://localhost:8080). The Bifrost dashboard asks for `BIFROST_SETUP_TOKEN` (any secret you put in `.env`) once, to create the admin account:
 
@@ -105,7 +113,13 @@ cd backend
 uv run uvicorn assay.api:app --reload
 ```
 
-Set `ASSAY_SEED_FIXTURES=1` to load the fixture runs into an empty DB for frontend work.
+**Benchmark** (from the repository root, with Bifrost running and `.env` variables exported):
+
+```bash
+cd backend && ASSAY_DB=bench.db uv run python -m assay.bench
+```
+
+This is resumable: counted runs are skipped, while errors, interrupted runs and fallback runs are retried. Original records are kept.
 
 **Bifrost alone** (UI at http://localhost:8080, reads `bifrost/config.json`; export the keys from `.env` first):
 
@@ -149,7 +163,9 @@ docker-compose.yml  app + Bifrost, assay.db in a volume
 
 ## Methodology
 
-Same pools, tasks and trap seeds for every agent. Answers verified in-pool by two people. pass^3 and spread reported, not just averages. Judge checked against 50 claims labeled by Claude and reviewed by a human: 48% agreement (24/50). Our agents are tuned only on separate practice tasks, and at least one outside agent is always on the board. Results that make our own agents look bad get published too. Full rules: [`docs/PRD.md`](docs/PRD.md) §9.
+Same pools, tasks and trap seeds for every agent. Answers verified in-pool by two people. pass^3 and spread reported, not just averages. Judge checked against 50 claims labeled by Claude and reviewed by a human: 48% agreement (24/50). Our agents are tuned only on separate practice tasks, and at least one outside agent is always on the board. Cost is estimated from token usage at list prices in `pricing.json` (free tiers bill $0). Failed runs with no usage record have $0 recorded cost. Results that make our own agents look bad get published too. Full rules: [`docs/PRD.md`](docs/PRD.md) §9.
+
+10 runs failed: 6 in test batches before the benchmark and 4 benchmark runs that hit free-tier 429s or since-fixed grader crashes, then retried under the resume rule. Raw records are kept.
 
 ## Team
 
