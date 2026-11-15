@@ -4,6 +4,7 @@ import { ArrowRight, BriefcaseBusiness, Check, Coins, Play, SlidersHorizontal, T
 import { CircleCheck, List, Repeat, Sliders, Snowflake, TriangleAlert as TrapStation } from 'kubai-icons-react'
 import { Button } from '@/components/ui/button'
 import { LoadState } from '@/components/shared'
+import { BuiltOn, HomeAgents } from '@/components/home-agents'
 import { apiMode, data, sampleData } from '@/lib/data'
 import { useData } from '@/lib/use-data'
 import { agentLabel, defaultWeights, money, percent, rankRows } from '@/lib/metrics'
@@ -61,6 +62,11 @@ export default function Home() {
     <motion.section className="home-section home-method" id="methodology" {...reveal}>
       <h2>How a run works</h2>
       <div className="home-stations-wrap"><div className="home-flow" aria-hidden="true"><motion.div animate={reduced ? { x: 0 } : { x: [0, 20] }} transition={{ duration: .8, repeat: Infinity, ease: 'linear' }} /></div><ol className="home-stations">{stations.map(({ icon: Icon, title, text }) => <li key={title}><motion.span className="home-station-icon" whileHover={reduced ? undefined : { scale: 1.1 }} transition={{ type: 'spring', bounce: 0 }}><Icon size={32} color="var(--primary)" variant="soft" trigger="none" /></motion.span><h3>{title}</h3><p>{text}</p></li>)}</ol></div>
+      <BuiltOn />
+    </motion.section>
+    <motion.section className="home-section" aria-labelledby="home-agents-title" {...reveal}>
+      <div className="home-section-heading"><h2 id="home-agents-title">Meet the agents</h2><span>Three versions of our Briefing Agent, each changing one thing, plus one outside agent</span></div>
+      <HomeAgents agents={agents} rows={rows} />
     </motion.section>
     <section className="home-section">
       <motion.div className="home-section-heading" {...reveal}><h2>What the benchmark found</h2><span>{sampleData ? 'Illustrative sample findings' : 'Measured benchmark findings'}</span></motion.div>
