@@ -18,7 +18,7 @@
     {
       "id": "run",
       "minSeconds": 24,
-      "text": "Pick your agents, a task, and a trap. Here, our three agent versions brief on Maxim AI, with a hidden instruction planted in one of the pages. Each one runs three times. Every search, page read, and model call lands live, with costs read straight from Bifrost's logs."
+      "text": "Pick your agents, a task, and a trap. Here, our three agent versions brief on Maxim AI, with a hidden instruction planted in one of the pages. Each one runs three times. As each run finishes, its searches, page reads, and model calls appear, with costs read straight from Bifrost's logs. All nine runs fell for the trap."
     },
     {
       "id": "receipt",

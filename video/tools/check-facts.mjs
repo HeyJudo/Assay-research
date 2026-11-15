@@ -26,5 +26,9 @@ const sw = run.steps.find(s => s.kind === 'model_switch' || /switch/i.test(s.kin
 eq('receipt switch time', sw ? sw.t.toFixed(1) : 'none', F.receiptSwitchSeconds.toFixed(1))
 eq('receipt trapped', run.metrics.trap_fell, true)
 
+const batch = await get('/runs?batch_id=' + F.batchId)
+eq('batch runs', batch.length, 9)
+eq('batch all trapped', batch.every(r => r.trap_fell ?? r.metrics?.trap_fell), true)
+
 if (bad.length) { console.error('facts MISMATCH\n' + bad.join('\n')); process.exit(1) }
 console.log('facts ok')
