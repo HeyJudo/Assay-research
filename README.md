@@ -149,7 +149,7 @@ docker-compose.yml  app + Bifrost, assay.db in a volume
 
 ## Methodology
 
-Same pools, tasks and trap seeds for every agent. Answers verified in-pool by two people. pass^3 and spread reported, not just averages. Judge validated against 50 hand-labeled claims. Our agents are tuned only on separate practice tasks, and at least one outside agent is always on the board. Results that make our own agents look bad get published too. Full rules: [`docs/PRD.md`](docs/PRD.md) §9.
+Same pools, tasks and trap seeds for every agent. Answers verified in-pool by two people. pass^3 and spread reported, not just averages. Judge checked against 50 claims labeled by Claude and reviewed by a human: 48% agreement (24/50). Our agents are tuned only on separate practice tasks, and at least one outside agent is always on the board. Results that make our own agents look bad get published too. Full rules: [`docs/PRD.md`](docs/PRD.md) §9.
 
 ## Team
 
@@ -161,7 +161,7 @@ Same pools, tasks and trap seeds for every agent. Answers verified in-pool by tw
 
 ## AI tool disclosure
 
-We build with AI-assisted development. Claude Code (Anthropic) helped with planning, the spec, documentation and code. Every change is reviewed and merged by a team member. Assay itself calls LLMs at runtime: Gemini models as the agents under test and an OpenAI model as the judge, all through Bifrost.
+We build with AI-assisted development. Claude Code (Anthropic) helped with planning, the spec, documentation and code. Every change is reviewed and merged by a team member. Claude also drafted the 50 judge-validation labels (`data/labels/`), and a team member reviewed each one. Assay itself calls LLMs at runtime: Gemini models as the agents under test and an OpenAI model as the judge, all through Bifrost.
 
 ## Docs
 

@@ -1,0 +1,13 @@
+{
+  "claims": 50,
+  "matches": 24,
+  "agreement_pct": 48,
+  "disagreements": {
+    "not_found->unmatched": 2,
+    "supported->trap": 3,
+    "supported->unmatched": 3,
+    "supported->unsupported": 15,
+    "unsupported->not_found": 2,
+    "unsupported->supported": 1
+  }
+}
