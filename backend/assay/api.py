@@ -1,5 +1,5 @@
 """API (PRD §8). Runs come from SQLite (seeded from fixtures when empty). Leaderboard and compare aggregate benchmark runs
-(batch ids starting "bench_") and fall back to fixtures until one exists. Agents come from backend/agents/*/agent.json,
+(batch ids starting "bench_") and fall back to published results, then fixtures. Agents come from backend/agents/*/agent.json,
 tasks from data/tasks.
 Batches run through runner.start_batch."""
 
@@ -26,6 +26,7 @@ from assay.models import (Agent, BatchCreated, BatchRequest, BatchStatus, BriefR
 
 ROOT = Path(__file__).resolve().parents[2]
 FIXTURES = ROOT / "web" / "src" / "fixtures"  # ponytail: one copy shared with the web app
+BENCH_RESULTS = ROOT / "data" / "results" / "bench_runs.json"
 DIST = ROOT / "web" / "dist"
 
 
@@ -55,7 +56,10 @@ BENCH_PREFIX = "bench_"  # full-benchmark batch ids; live-demo batches are "b_"
 
 def bench_runs() -> list[RunRecord]:
     # ponytail: loads every record then filters, a LIKE query in store if runs reach the thousands
-    return [r for r in store.list_runs() if r.batch_id.startswith(BENCH_PREFIX)]
+    runs = [r for r in store.list_runs() if r.batch_id.startswith(BENCH_PREFIX)]
+    if not runs and BENCH_RESULTS.exists():
+        runs = [RunRecord.model_validate(r) for r in json.loads(BENCH_RESULTS.read_text("utf-8"))]
+    return runs
 
 
 def rows(runs: list[RunRecord]) -> list[LeaderboardRow]:
