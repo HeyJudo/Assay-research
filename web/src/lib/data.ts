@@ -1,5 +1,6 @@
 import { connectBatchStream } from './batch-stream'
 import { registerAgents, agentLabel } from './agent-names'
+import { readStored, writeStored } from './run-session'
 import { agents, leaderboard, runs, tasks } from '@/fixtures'
 import type { Agent, BatchEvent, BatchRequest, LeaderboardRow, RunRecord, RunSummary, Task } from '@/types'
 
@@ -10,6 +11,22 @@ registerAgents(agents)
 const base = (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/$/, '')
 const savedRuns = new Map<string, RunRecord>()
 const simulatedBatches = new Map<string, RunRecord[]>()
+const demoPositions = new Map<string, number>()
+if (!apiMode) {
+  const stored = readStored<RunRecord[]>('assay:demo-records')
+  if (Array.isArray(stored)) for (const record of stored) {
+    if (!record || typeof record.id !== 'string' || typeof record.batch_id !== 'string' || !Array.isArray(record.steps) || !record.metrics || !record.config || !record.output) continue
+    savedRuns.set(record.id, record)
+    if (record.batch_id.startsWith('demo_') && record.batch_id !== 'demo_briefing') {
+      simulatedBatches.set(record.batch_id, [...(simulatedBatches.get(record.batch_id) ?? []), record])
+    }
+  }
+  const positions = readStored<Record<string, number>>('assay:demo-progress')
+  if (positions && typeof positions === 'object') for (const [id, position] of Object.entries(positions)) {
+    if (Number.isInteger(position) && position >= 0) demoPositions.set(id, position)
+  }
+}
+function persistDemoRecords() { writeStored('assay:demo-records', [...savedRuns.values()]) }
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const response = await fetch(`${base}/api${path}`, { ...options, headers: { ...(options?.body ? { 'Content-Type': 'application/json' } : {}), ...options?.headers } })
@@ -29,7 +46,7 @@ export const data = {
   run: async (id: string): Promise<RunRecord> => {
     if (apiMode) return request(`/runs/${encodeURIComponent(id)}`)
     const run = savedRuns.get(id) ?? runs.find(r => r.id === id)
-    if (!run) throw new Error('Run not found. Simulated runs are kept in memory only; start a new demo after refreshing.')
+    if (!run) throw new Error('Run not found. Open an existing receipt or start a new demo benchmark.')
     return run
   },
   batch: async (config: BatchRequest) => {
@@ -71,6 +88,7 @@ export const data = {
     }))
     records.forEach(r => savedRuns.set(r.id, r))
     simulatedBatches.set(batch_id, records)
+    persistDemoRecords()
     return { batch_id }
   },
   subscribe: (id: string, receive: (event: BatchEvent) => void, fail: (message: string) => void): (() => void) => {
@@ -78,12 +96,21 @@ export const data = {
       return connectBatchStream(`${base}/api/batches/${encodeURIComponent(id)}/stream`, receive, fail)
     }
     const records = simulatedBatches.get(id) ?? []
+    if (!records.length) { fail('This demo batch is unavailable in this browser. Start a new benchmark.'); return () => {} }
     const events: BatchEvent[] = records.map(r => ({ event: 'run_started', data: { run_id: r.id, batch_id: id, agent_id: r.agent_id, repeat: r.repeat, started_at: r.started_at } }))
-    for (let i = 0; i < 3; i++) records.forEach(r => { const step = r.steps[i]; if (step) events.push({ event: 'step', data: { run_id: r.id, step } }) })
+    for (let i = 0; i < Math.max(...records.map(r => r.steps.length)); i++) records.forEach(r => { const step = r.steps[i]; if (step) events.push({ event: 'step', data: { run_id: r.id, step } }) })
     records.forEach(r => events.push({ event: 'run_done', data: { run_id: r.id, status: 'done', duration_s: r.duration_s!, metrics: r.metrics } }))
     events.push({ event: 'batch_done', data: { batch_id: id } })
-    let index = 0
-    const timer = window.setInterval(() => { if (index < events.length) receive(events[index++]); if (index >= events.length) window.clearInterval(timer) }, 160)
+    let index = Math.min(demoPositions.get(id) ?? 0, events.length - 1)
+    // Replaying the prefix is idempotent and covers a refresh between saving the
+    // event cursor and React committing the corresponding session snapshot.
+    for (let replay = 0; replay < index; replay++) receive(events[replay])
+    const timer = window.setInterval(() => {
+      if (index < events.length) receive(events[index++])
+      demoPositions.set(id, index)
+      writeStored('assay:demo-progress', Object.fromEntries(demoPositions))
+      if (index >= events.length) window.clearInterval(timer)
+    }, 160)
     return () => window.clearInterval(timer)
   },
   brief: async (subject: string, meeting_time: string, version: string): Promise<{ run_id: string }> => {
@@ -102,6 +129,7 @@ export const data = {
     record.steps = []
     record.metrics = { success: false, steps: 0, tool_calls: 0, tokens: 0, cost_usd: 0, cost_by_model: {}, switched: false, trap_fell: false, abstention: null, claims_supported_pct: null }
     savedRuns.set(record.id, record)
+    persistDemoRecords()
     return { run_id: record.id }
   },
 }
