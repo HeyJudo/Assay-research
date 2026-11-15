@@ -3,6 +3,8 @@ WORKDIR /app/web
 COPY web/package.json web/package-lock.json ./
 RUN npm ci
 COPY web/ ./
+# The built app talks to the real API (same origin). Without this it builds in demo mode and fakes runs.
+ENV VITE_DATA_MODE=api
 RUN npm run build
 
 FROM python:3.12-slim
