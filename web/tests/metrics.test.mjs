@@ -22,8 +22,8 @@ test('no successes and absent task classes are unavailable, not free or perfect'
   assert.ok(Number.isNaN(result.cost_per_correct))
   assert.ok(Number.isNaN(result.accuracy))
   assert.ok(Number.isNaN(result.honesty))
-  assert.equal(money(result.cost_per_correct), '—')
-  assert.equal(percent(result.accuracy), '—')
+  assert.equal(money(result.cost_per_correct), 'N/A')
+  assert.equal(percent(result.accuracy), 'N/A')
   assert.equal(aggregate([], 'a'), null)
 })
 

@@ -1,17 +1,27 @@
-import { Input } from '@/components/ui/input'
 import { useEffect, useRef, useState } from 'react'
-import { Link } from 'react-router'
-import { ArrowRight, BookOpen, FileCheck2, LoaderCircle, Search, ShieldCheck } from 'lucide-react'
-import { Card, CardContent, CardHeader } from '@/components/ui/card'
+import { Link, useSearchParams } from 'react-router'
+import { motion, useReducedMotion } from 'motion/react'
+import { ArrowRight, BookOpen, CircleCheck, FileQuestion, LoaderCircle, ReceiptText, Search } from 'lucide-react'
+import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
-import { BriefText, Heading, LoadState } from '@/components/shared'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { BriefText, LoadState, safeUrl } from '@/components/shared'
 import { apiMode, data, sampleData } from '@/lib/data'
 import { useData } from '@/lib/use-data'
-import { agentLabel, defaultWeights, percent, rankRows } from '@/lib/metrics'
+import { agentLabel, defaultWeights, money, percent, rankRows } from '@/lib/metrics'
+import { splitBriefing } from '@/lib/briefing-output'
 import type { RunRecord } from '@/types'
+import './briefing.css'
+
+const sectionDescriptions: Record<string, string> = {
+  verified: 'Backed by a quoted source',
+  uncertain: 'One source, not confirmed',
+  'not found': 'Looked for it, found nothing',
+}
 
 export default function Briefing() {
+  const reduced = useReducedMotion()
+  const [params] = useSearchParams()
   const query = useData(() => Promise.all([data.agents(), data.leaderboard()]))
   const [subject, setSubject] = useState('')
   const [meeting, setMeeting] = useState(() => {
@@ -22,7 +32,9 @@ export default function Briefing() {
   })
   const [version, setVersion] = useState('')
   const [submittedSubject, setSubmittedSubject] = useState('')
+  const [submittedMeeting, setSubmittedMeeting] = useState('')
   const [run, setRun] = useState<RunRecord | null>(null)
+  const [pendingRun, setPendingRun] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const controller = useRef(0)
@@ -32,14 +44,20 @@ export default function Briefing() {
   const best = rankRows(rows.filter(row => row.agent_id.startsWith('briefing-')), defaultWeights)[0]
   const selected = version || best?.agent_id || 'briefing-baseline'
   const selectedRow = rows.find(row => row.agent_id === selected)
+  const output = splitBriefing(run?.output.text ?? '')
+  const sources = [...new Set([...(run?.output.text.matchAll(/\[[^\]]+\]\((https?:\/\/[^)]+)\)/g) ?? [])].map(match => safeUrl(match[1])).concat((run?.claims ?? []).map(claim => safeUrl(claim.source_url))).filter((url): url is string => !!url))]
+  const receiptParams = new URLSearchParams(params)
+  if (run || pendingRun) receiptParams.set('run', run?.id ?? pendingRun)
   async function submit(e: React.FormEvent) {
     e.preventDefault(); setError('')
     if (!subject.trim() || !meeting) { setError('Enter a company or person and a meeting date/time.'); return }
     if (!Number.isFinite(new Date(meeting).getTime())) { setError('Enter a valid meeting time.'); return }
-    setBusy(true); setRun(null); setSubmittedSubject(subject.trim())
+    setBusy(true); setRun(null); setPendingRun(''); setSubmittedSubject(subject.trim()); setSubmittedMeeting(meeting)
     const session = ++controller.current
     try {
       const result = await data.brief(subject.trim(), new Date(meeting).toISOString(), selected)
+      if (session !== controller.current) return
+      setPendingRun(result.run_id)
       for (let attempt = 0; attempt < 120; attempt++) {
         if (session !== controller.current) return
         let record: RunRecord
@@ -48,14 +66,33 @@ export default function Briefing() {
           throw pollError
         }
         if (session !== controller.current) return
-        if (record.status !== 'running') { setRun(record); setBusy(false); return }
+        setRun(record)
+        if (record.status !== 'running') { setBusy(false); return }
         await new Promise(resolve => setTimeout(resolve, 1000))
       }
-      throw new Error('The briefing is taking longer than expected. Check the server before trying again.')
+      throw new Error('The briefing is taking longer than expected. Open its receipt to inspect the recorded progress.')
     } catch (e) { if (session === controller.current) { setError(e instanceof Error ? e.message : 'Unable to create a briefing'); setBusy(false) } }
   }
-  return <><Heading eyebrow="THE AGENT WE PUT TO THE TEST" title="Prepare a meeting briefing" description="A focused, one-page briefing. Recent developments, clear sources, and the questions worth asking." />
-    <div className="briefing-layout"><div className="stack"><Card><CardHeader><h2>Prepare a briefing</h2><BookOpen size={19} /></CardHeader><CardContent><form onSubmit={submit} className="stack"><label>Company or person<Input placeholder="e.g. Tavily or a company founder" value={subject} onChange={e => setSubject(e.target.value)} maxLength={150} disabled={busy} required /></label><label>Meeting date & time<Input type="datetime-local" value={meeting} onChange={e => setMeeting(e.target.value)} disabled={busy} required /><small className="field-hint">Your local time zone: {Intl.DateTimeFormat().resolvedOptions().timeZone}. Sent to the API with a UTC offset.</small></label><label>Agent version<select value={selected} onChange={e => setVersion(e.target.value)} disabled={busy}>{agents.filter(a => a.kind === 'ours').map(a => <option key={a.id} value={a.id}>{agentLabel(a.id)}{a.id === best?.agent_id ? ' · Top sample fit' : ''}</option>)}</select></label><div className="brief-window"><Search size={17} /><span>Research window<strong>30 days before your meeting</strong></span></div>{error && <p className="error-message" role="alert">{error}</p>}<Button type="submit" disabled={busy}>{busy ? <LoaderCircle size={16} className="spin" /> : <Search size={16} />}{busy ? 'Preparing your briefing…' : apiMode ? 'Research with Tavily' : 'Generate sample briefing'}</Button><p className="fine-print">{apiMode ? 'Uses the configured API. The briefing endpoint is owned by the backend teammate.' : 'Demo mode produces a sample layout only. No live Tavily search is performed.'}</p></form></CardContent></Card><Card className="soft-card"><CardContent><ShieldCheck size={22} /><h3>Selected agent benchmark</h3><p>{selectedRow ? `${agentLabel(selected)} has ${percent(selectedRow.accuracy)} ${sampleData ? 'sample ' : ''}benchmark accuracy. This is not a score for your new briefing.` : 'Inspect benchmark performance before choosing a version.'}</p><Link to="/leaderboard" className="text-link">Explore agent evidence <ArrowRight size={14} /></Link></CardContent></Card></div>
-    <Card className="brief-paper"><CardHeader><div><span className="eyebrow">MEETING INTELLIGENCE</span><h2>{run ? submittedSubject : 'Briefing output'}</h2></div><Badge variant="outline">{apiMode ? 'Live request' : 'Sample output'}</Badge></CardHeader><CardContent>{run ? <><BriefText text={run.output.text} />{(run.status === 'error' || run.status === 'budget_exceeded') && <p className="error-message">{run.status === 'budget_exceeded' ? 'The agent reached its budget limit.' : 'The agent ended with an error.'} Review the receipt for details.</p>}<div className="brief-footer"><span>{agentLabel(run.agent_id)}</span><Button variant="outline" asChild><Link to={`/runs/${run.id}`}><FileCheck2 size={15} />Inspect receipt</Link></Button></div></> : <div className="brief-placeholder">{busy ? <LoaderCircle className="spin" size={42} /> : <BookOpen size={42} />}<h3>{busy ? 'Gathering your briefing…' : 'No briefing generated yet'}</h3><p>Your briefing separates what is supported, what is uncertain, and what the agent could not find.</p><div className="section-preview">{['Verified', 'Uncertain', 'Not found', 'Open questions'].map((section, i) => <div key={section}><span className={`preview-dot preview-${i}`} /><strong>{section}</strong><div className="skeleton-line" /></div>)}</div></div>}</CardContent></Card></div>
-  </>
+  return <div className="briefing-page">
+    <form className="briefing-form" onSubmit={submit}>
+      <div className="briefing-intro"><h1>Who are you meeting?</h1><p>Get a brief that separates what is verified from what is not. {apiMode ? 'This one searches the live web.' : 'Demo mode shows the layout without live research.'}</p></div>
+      <label htmlFor="brief-who">Company or person<Input id="brief-who" placeholder="e.g. Tavily" value={subject} onChange={e => setSubject(e.target.value)} maxLength={150} disabled={busy} required /></label>
+      <label htmlFor="brief-when">Meeting time<Input id="brief-when" type="datetime-local" value={meeting} onChange={e => setMeeting(e.target.value)} disabled={busy} required /><small>Your time zone: {Intl.DateTimeFormat().resolvedOptions().timeZone}.</small></label>
+      <div className="briefing-version"><label htmlFor="brief-version">Agent version</label><Select value={selected} onValueChange={setVersion} disabled={busy}><SelectTrigger id="brief-version" aria-label="Agent version"><SelectValue /></SelectTrigger><SelectContent>{agents.filter(agent => agent.kind === 'ours').map(agent => <SelectItem key={agent.id} value={agent.id}>{agentLabel(agent.id)}{agent.id === best?.agent_id ? ' (top pick)' : ''}</SelectItem>)}</SelectContent></Select><p>{selectedRow ? <>{agentLabel(selected)} has <span className="mono">{percent(selectedRow.accuracy)}</span> accuracy and <span className="mono">{percent(selectedRow.trap_resistance)}</span> trap resistance in the {sampleData ? 'sample' : 'full'} benchmark. </> : 'No benchmark score is available for this version. '}<Link to="/leaderboard">See why</Link></p></div>
+      {error && <p className="error-message" role="alert">{error}</p>}
+      <Button type="submit" disabled={busy}>{busy ? <LoaderCircle size={18} className="spin" /> : null}{busy ? 'Writing the brief…' : 'Write the brief'}{!busy && <ArrowRight size={18} />}</Button>
+      <p className="briefing-mode-note">{apiMode ? 'Researches the 30 days before your meeting with Tavily.' : 'Sample output only. No live searches, model calls or provider spending.'}</p>
+    </form>
+    <article className="briefing-paper" aria-label="Meeting briefing" aria-busy={busy}>
+      <div className="briefing-paper-header"><div><h2>{output.title ?? (submittedSubject || 'Your meeting brief')}</h2><p className="mono">{submittedMeeting ? `meeting ${submittedMeeting.replace('T', ' · ')}` : 'Verified facts, uncertainty and open questions'}{run?.duration_s != null && ` · written in ${run.duration_s.toFixed(1)} s`}{run && ` · ${money(run.metrics.cost_usd)}`}</p></div>{(run || pendingRun) && <Button variant="outline" asChild><Link to={`?${receiptParams}`}><ReceiptText size={18} />Open the receipt</Link></Button>}</div>
+      {run && run.status !== 'running' && run.status !== 'done' && <p className="error-message" role="alert">{run.status === 'budget_exceeded' ? 'The agent reached its budget limit.' : 'The agent ended with an error.'} Review the receipt for details.</p>}
+      {run && output.sections.length ? output.sections.map((section, index) => {
+        const key = section.heading.toLowerCase()
+        return <motion.section className={`briefing-output-section briefing-output-${key.replaceAll(' ', '-')}`} key={`${section.heading}-${index}`} initial={reduced ? false : { opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ type: 'spring', bounce: 0, duration: .5, delay: reduced ? 0 : index * .12 }}>{section.heading && <h3>{sectionDescriptions[key] ? <><span className="briefing-section-badge">{section.heading}</span><span>{sectionDescriptions[key]}</span></> : section.heading === 'Open questions' ? 'Questions to ask in the meeting' : section.heading}</h3>}<BriefText text={section.text} /></motion.section>
+      }) : <div className="briefing-placeholder" role="status">{busy ? <><Search size={32} /><h3>Researching {submittedSubject}.</h3><p>Actual search and model steps appear as the agent records them.</p></> : <><BookOpen size={32} /><h3>{run ? 'The agent returned no briefing text.' : 'Your brief will appear here.'}</h3><p>Choose who you are meeting, then write a brief.</p></>}<div className="briefing-section-preview">{[{ name: 'Verified', icon: CircleCheck }, { name: 'Uncertain', icon: FileQuestion }, { name: 'Not found', icon: Search }, { name: 'Open questions', icon: BookOpen }].map(({ name, icon: Icon }) => <span key={name}><Icon size={16} />{name}</span>)}</div></div>}
+      {busy && run?.steps.length ? <section className="briefing-live-steps"><h3>Live research</h3><ol>{run.steps.map(step => <motion.li key={step.i} initial={reduced ? false : { opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ type: 'spring', bounce: 0 }}><span className="mono">{step.t.toFixed(1)}s</span><span><strong>{step.kind}</strong> {step.detail}</span></motion.li>)}</ol></section> : null}
+      {sources.length > 0 && <div className="briefing-sources"><h3>Sources</h3>{sources.map((url, index) => <a className="mono" href={url} key={url} target="_blank" rel="noreferrer">[{index + 1}] {url}</a>)}</div>}
+      {run && <p className="briefing-record-note">{agentLabel(run.agent_id)} · {apiMode ? 'Live research record' : 'Sample output. No live facts were researched.'}</p>}
+    </article>
+  </div>
 }
