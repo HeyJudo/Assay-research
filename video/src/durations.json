@@ -1,0 +1,34 @@
+{
+  "hook": {
+    "audioSeconds": 7.894785,
+    "frames": 330
+  },
+  "problem": {
+    "audioSeconds": 10.588299,
+    "frames": 390
+  },
+  "how": {
+    "audioSeconds": 22.755556,
+    "frames": 720
+  },
+  "run": {
+    "audioSeconds": 19.319002,
+    "frames": 720
+  },
+  "receipt": {
+    "audioSeconds": 14.675011,
+    "frames": 690
+  },
+  "results": {
+    "audioSeconds": 16.904127,
+    "frames": 690
+  },
+  "briefing": {
+    "audioSeconds": 16.068209,
+    "frames": 600
+  },
+  "outro": {
+    "audioSeconds": 3.482993,
+    "frames": 330
+  }
+}

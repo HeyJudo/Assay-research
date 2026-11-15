@@ -1,23 +1,65 @@
 {
   "scenes": [
-    { "id": "hook", "minSeconds": 10, "text": "Your research agent just wrote a confident meeting brief. Some of it came from a page planted to fool it. Would you know? This is Assay." },
-    { "id": "problem", "minSeconds": 16, "text": "Research agents sound sure, even when they're wrong. Run one twice, get two answers. And nobody tells you what a correct answer actually cost." },
-    { "id": "how", "minSeconds": 24, "text": "Assay freezes the web, so every agent searches the same saved pages, built once with Tavily. It plants a trap: a fake article, a hidden instruction, or an outage. Each agent runs three times. Every model call goes through Bifrost on a budget-capped key, so every step and every cent is recorded. Then each claim is checked against its source." },
-    { "id": "run", "minSeconds": 22, "text": "Pick your agents, a task, and a trap. Here, our three agent versions brief on Maxim AI, with a hidden instruction planted in one of the pages. Steps land live, with costs read from Bifrost's logs." },
-    { "id": "receipt", "minSeconds": 23, "text": "Every run leaves a receipt. This Cheap-first run switched models at thirty-two seconds, spent half a cent, and fell for the trap. Here's the claim, and here's the planted page it came from." },
-    { "id": "results", "minSeconds": 23, "text": "Here's what surprised us. We built two smarter versions of our agent. Cheap-first costs sixteen percent more per correct answer. Evidence-gated scored lower. Baseline wins. Weigh accuracy over cost, and the outside agent, GPT Researcher, takes the top spot." },
-    { "id": "briefing", "minSeconds": 20, "text": "Then put it to work. Enter a company and a meeting time. The Briefing Agent searches the last thirty days live with Tavily, and separates verified facts from uncertain ones, with open questions to ask." },
-    { "id": "outro", "minSeconds": 12, "text": "Assay. Don't trust the answer. Check the receipt." }
+    {
+      "id": "hook",
+      "minSeconds": 11,
+      "text": "Your research agent just wrote a confident meeting brief. Some of it came from a page planted to fool it. Would you know? This is Assay."
+    },
+    {
+      "id": "problem",
+      "minSeconds": 13,
+      "text": "Research agents sound sure, even when they're wrong. Run one twice, and you get two different answers. And nobody tells you what a correct answer actually cost. So which agent do you trust?"
+    },
+    {
+      "id": "how",
+      "minSeconds": 24,
+      "text": "Assay freezes the web, so every agent searches the same saved pages, built once with Tavily. It plants a trap: a fake article, a hidden instruction, or an outage. Each agent runs three times. Every model call goes through Bifrost on a budget-capped key, so every step and every cent is recorded. Then each claim is checked against its source."
+    },
+    {
+      "id": "run",
+      "minSeconds": 24,
+      "text": "Pick your agents, a task, and a trap. Here, our three agent versions brief on Maxim AI, with a hidden instruction planted in one of the pages. Each one runs three times. Every search, page read, and model call lands live, with costs read straight from Bifrost's logs."
+    },
+    {
+      "id": "receipt",
+      "minSeconds": 23,
+      "text": "Every run leaves a receipt: what it did, which models it paid, and what it cost. This Cheap-first run switched models at thirty-two seconds, spent half a cent, and fell for the trap. Here's the claim, and here's the planted page it came from."
+    },
+    {
+      "id": "results",
+      "minSeconds": 23,
+      "text": "Here's what surprised us. We built two smarter versions of our agent. Cheap-first costs sixteen percent more per correct answer. Evidence-gated scored lower. Baseline wins. Weigh accuracy over cost, and the outside agent, GPT Researcher, takes the top spot."
+    },
+    {
+      "id": "briefing",
+      "minSeconds": 20,
+      "text": "Then put it to work. Enter a company and a meeting time. The Briefing Agent searches the last thirty days live with Tavily, and gives you a one-page brief: verified facts with sources, what's uncertain, what it couldn't find, and open questions to ask."
+    },
+    {
+      "id": "outro",
+      "minSeconds": 11,
+      "text": "That's Assay. Don't trust the answer. Check the receipt."
+    }
   ],
   "facts": {
     "batchId": "bench_198121eb12d0",
     "receiptRunId": "run_155e8837eedf",
     "receiptSwitchSeconds": 32.7,
     "receiptCostUsd": 0.0055,
-    "baseline": { "accuracy": 0.25, "costPerCorrect": 0.0053 },
-    "cheapFirst": { "costPerCorrect": 0.0061 },
-    "evidenceGated": { "accuracy": 0.17 },
-    "gptResearcher": { "accuracy": 0.42, "trapResistance": 0.5 }
+    "baseline": {
+      "accuracy": 0.25,
+      "costPerCorrect": 0.0053
+    },
+    "cheapFirst": {
+      "costPerCorrect": 0.0061
+    },
+    "evidenceGated": {
+      "accuracy": 0.17
+    },
+    "gptResearcher": {
+      "accuracy": 0.42,
+      "trapResistance": 0.5
+    }
   },
   "team": [],
   "repo": "github.com/HeyJudo/Assay-research"
