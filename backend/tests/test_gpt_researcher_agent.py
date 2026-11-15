@@ -1,6 +1,8 @@
 import json
 import os
 import subprocess
+import threading
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 from assay import runner
 from assay.models import Task
@@ -27,17 +29,45 @@ def test_agent_is_discoverable_with_lf_run():
     assert b"\r" not in (AGENT / "run").read_bytes()
 
 
+def bifrost_stub(seen):
+    """Answers the wrapper's fit call with the REPORT part of its prompt, so the test can read the fake report."""
+    class H(BaseHTTPRequestHandler):
+        def do_POST(self):
+            body = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
+            seen.append((self.headers["Authorization"], body["model"]))
+            prompt = body["messages"][0]["content"]
+            reply = prompt.split("REPORT:\n", 1)[1].split("\n\nRewrite REPORT", 1)[0]
+            data = json.dumps({"choices": [{"message": {"content": reply}}]}).encode()
+            self.send_response(200)
+            self.send_header("Content-Length", str(len(data)))
+            self.end_headers()
+            self.wfile.write(data)
+
+        def log_message(self, *a):
+            pass
+    srv = ThreadingHTTPServer(("127.0.0.1", 0), H)
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    return srv
+
+
 def test_wrapper_routes_by_env_only(tmp_path):
     (tmp_path / "gpt_researcher.py").write_text(FAKE, encoding="utf-8")
     out = tmp_path / "out.md"
+    seen = []
+    srv = bifrost_stub(seen)
+    base = f"http://127.0.0.1:{srv.server_port}/v1"
     env = {**os.environ, "PYTHONPATH": str(tmp_path), "ASSAY_TASK": "Q?", "ASSAY_AS_OF": "2026-01-02",
-           "ASSAY_OUTPUT": str(out), "TAVILY_API_KEY": "", "OPENAI_BASE_URL": "http://bifrost/v1",
-           "OPENAI_API_KEY": "sk-bf-run", "HTTPS_PROXY": "http://run:none@127.0.0.1:1"}
-    subprocess.run(runner._command(AGENT / "run"), env=env, check=True)
+           "ASSAY_OUTPUT": str(out), "TAVILY_API_KEY": "", "OPENAI_BASE_URL": base,
+           "OPENAI_API_KEY": "sk-bf-run", "HTTPS_PROXY": "http://run:none@127.0.0.1:1", "NO_PROXY": "127.0.0.1"}
+    try:
+        subprocess.run(runner._command(AGENT / "run"), env=env, check=True)
+    finally:
+        srv.shutdown()
     got = json.loads(out.read_text(encoding="utf-8"))
     model = json.loads((AGENT / "agent.json").read_text(encoding="utf-8"))["models"][0]
     assert got["query"] == "Q?\n\nAnswer as of 2026-01-02."
     assert got["env"] == {"RETRIEVER": "tavily", "FAST_LLM": f"openai:{model}", "SMART_LLM": f"openai:{model}",
                           "STRATEGIC_LLM": f"openai:{model}", "ALLOW_PRIVATE_URLS": "true",
-                          "TAVILY_API_KEY": "assay-proxy", "OPENAI_BASE_URL": "http://bifrost/v1",
+                          "TAVILY_API_KEY": "assay-proxy", "OPENAI_BASE_URL": base,
                           "OPENAI_API_KEY": "sk-bf-run", "HTTPS_PROXY": "http://run:none@127.0.0.1:1"}
+    assert seen == [("Bearer sk-bf-run", model)]  # one fit call, on the run's key and model

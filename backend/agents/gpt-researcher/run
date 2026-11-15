@@ -5,10 +5,14 @@ Search: the runner sets HTTPS_PROXY and the CA bundle. GPT Researcher's Tavily r
 `requests`, which honors both, so the search proxy answers api.tavily.com and serves the pool pages.
 LLM: the runner sets OPENAI_BASE_URL (Bifrost) and OPENAI_API_KEY (the run's virtual key). GPT Researcher's
 OpenAI provider reads both. No GPT Researcher code is patched.
+Output: one wrapper call (fit) puts its report in the task's answer format (PRD §13, Nov 15).
 """
 import asyncio
 import json
 import os
+import time
+import urllib.error
+import urllib.request
 from pathlib import Path
 
 model = json.loads((Path(__file__).parent / "agent.json").read_text(encoding="utf-8"))["models"][0]
@@ -26,11 +30,43 @@ os.environ["TAVILY_API_KEY"] = os.environ.get("TAVILY_API_KEY") or "assay-proxy"
 from gpt_researcher import GPTResearcher  # after the env: GPT Researcher reads its config at import and init
 
 
+FIT = """QUESTION:
+{question}
+
+REPORT:
+{report}
+
+Rewrite REPORT as the answer QUESTION asks for, using only what REPORT says. Add nothing.
+- If QUESTION asks for a brief: use exactly the Markdown headings ## Verified, ## Uncertain, ## Not found,
+  ## Open questions, and keep each claim's source URL as a Markdown link.
+- Otherwise: reply with only the answer itself (for example a year or a name), or exactly "Not found" if REPORT
+  does not establish it."""
+
+
+def fit(question: str, report: str) -> str:
+    """Wrapper step, not GPT Researcher: one model call that puts its report in the task's answer format, so graders
+    score what it found, not its report layout. Same model, same Bifrost key, so the call is in the run's cost."""
+    body = json.dumps({"model": model, "temperature": 0,
+                       "messages": [{"role": "user", "content": FIT.format(question=question, report=report)}]})
+    request = urllib.request.Request(os.environ["OPENAI_BASE_URL"].rstrip("/") + "/chat/completions", data=body.encode(),
+                                     headers={"Content-Type": "application/json",
+                                              "Authorization": f"Bearer {os.environ['OPENAI_API_KEY']}"})
+    for attempt in range(5):
+        try:
+            with urllib.request.urlopen(request, timeout=120) as response:
+                return json.load(response)["choices"][0]["message"]["content"].strip()
+        except urllib.error.HTTPError as error:
+            if (error.code < 500 and error.code != 429) or attempt == 4:
+                raise
+        time.sleep(2 ** (attempt + 1))
+
+
 async def main():
     r = GPTResearcher(query=f"{os.environ['ASSAY_TASK']}\n\nAnswer as of {os.environ['ASSAY_AS_OF']}.",
                       report_type="research_report", verbose=False)
     await r.conduct_research()
-    Path(os.environ["ASSAY_OUTPUT"]).write_text(await r.write_report(), encoding="utf-8")
+    report = await r.write_report()
+    Path(os.environ["ASSAY_OUTPUT"]).write_text(fit(os.environ["ASSAY_TASK"], report), encoding="utf-8")
 
 
 asyncio.run(main())
