@@ -71,6 +71,7 @@ export default function Run() {
   const query = useData(() => Promise.all([data.agents(), data.tasks()]))
 
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; unsubscribe.current() } }, [])
+  useEffect(() => { window.scrollTo({ top: 0, behavior: 'instant' }) }, [draft.step, batch])
 
   useEffect(() => {
     if (!newRequested) return
