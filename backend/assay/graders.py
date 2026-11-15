@@ -99,7 +99,10 @@ OUTPUT:
 
 EVIDENCE:
 {evidence or '(no cited pool documents)'}"""
-    raw = _json(call(prompt))
+    try:
+        raw = _json(call(prompt))
+    except json.JSONDecodeError:  # one retry: a malformed judge reply should not end the run as error
+        raw = _json(call(prompt + "\n\nYour previous reply was not valid JSON. Return only the JSON array."))
     if not isinstance(raw, list):
         raise ValueError("judge response must be a JSON array")
     if cited_urls and not raw:

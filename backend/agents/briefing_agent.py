@@ -20,20 +20,25 @@ def prompt_hash(version: str) -> str:
     return hashlib.sha256(f"{version}:{MAIN_MODEL}:{SMALL_MODEL}:{prompt_code}".encode()).hexdigest()[:8]
 
 
-def _post(url: str, body: dict, headers: dict | None = None, attempts: int = 3) -> dict:
+def _post(url: str, body: dict, headers: dict | None = None, attempts: int = 5) -> dict:
     data = json.dumps(body).encode()
     request = urllib.request.Request(url, data=data, headers={"Content-Type": "application/json", **(headers or {})})
     for attempt in range(attempts):
+        wait = 2 ** attempt
         try:
             with urllib.request.urlopen(request, timeout=90) as response:
                 return json.load(response)
         except urllib.error.HTTPError as error:
-            if error.code < 500 or attempt == attempts - 1:
+            # 429 = free-tier rate limit: wait it out instead of crashing the run.
+            if (error.code < 500 and error.code != 429) or attempt == attempts - 1:
                 raise
+            if error.code == 429:
+                retry_after = error.headers.get("Retry-After", "")
+                wait = min(int(retry_after), 30) if retry_after.isdigit() else 2 ** (attempt + 1)
         except (urllib.error.URLError, TimeoutError, OSError):
             if attempt == attempts - 1:
                 raise
-        time.sleep(2 ** attempt)
+        time.sleep(wait)
     raise RuntimeError("request failed")
 
 

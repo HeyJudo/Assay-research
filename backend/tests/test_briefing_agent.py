@@ -155,6 +155,19 @@ def test_post_retries_read_timeout(monkeypatch):
     assert len(calls) == 2
 
 
+def test_post_waits_out_rate_limit(monkeypatch):
+    calls, sleeps = [], []
+    def urlopen(request, timeout):
+        calls.append(1)
+        if len(calls) == 1:
+            raise agent.urllib.error.HTTPError("u", 429, "Too Many Requests", {"Retry-After": "3"}, None)
+        return io.BytesIO(b'{"results":[]}')
+    monkeypatch.setattr(agent.urllib.request, "urlopen", urlopen)
+    monkeypatch.setattr(agent.time, "sleep", sleeps.append)
+    assert agent._post("https://example.test", {}) == {"results": []}
+    assert sleeps == [3]
+
+
 def test_fact_answer_does_not_require_briefing_sections(monkeypatch):
     monkeypatch.setattr(agent, "search", lambda query: SOURCES)
     monkeypatch.setattr(agent, "complete", lambda model, prompt: "1582")

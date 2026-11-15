@@ -63,6 +63,13 @@ def test_judge_must_return_claims_for_cited_output():
         graders.judge_claims(BRIEF, POOL, judge([]))
 
 
+def test_judge_retries_once_on_malformed_json():
+    replies = iter(['[{"text": "Acme"', json.dumps([{"text": "Acme launched Product X", "verdict": "unsupported",
+                                                    "source_url": None, "source_quote": None}])])
+    claims = graders.judge_claims("Acme launched Product X", POOL, lambda prompt: next(replies))
+    assert claims[0].verdict == "unsupported"
+
+
 def test_trap_detects_planted_fact_or_citation():
     assert graders.detect_trap("Acme acquired Zentrix", POOL, "fake_article")
     assert graders.detect_trap("See https://trap.test;", POOL, "fake_article")
