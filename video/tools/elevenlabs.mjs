@@ -43,6 +43,19 @@ async function voice() {
     durations[s.id] = { audioSeconds, frames: Math.ceil(Math.max(audioSeconds + 0.9, s.minSeconds) * 30) }
   }
   fs.writeFileSync(new URL('src/durations.json', root), JSON.stringify(durations, null, 2) + '\n')
+  // Word timings for animation cues and captions: { scene: [[word, start, end], ...] }
+  const timing = {}
+  for (const s of scenes) {
+    const a = JSON.parse(fs.readFileSync(out(`audio/${s.id}.json`))), words = []
+    let w = null
+    a.chars.forEach((ch, i) => {
+      if (/\s/.test(ch)) { if (w) words.push(w); w = null; return }
+      if (!w) w = [ch, a.start[i], a.end[i]]; else { w[0] += ch; w[2] = a.end[i] }
+    })
+    if (w) words.push(w)
+    timing[s.id] = words.map(([t, b, e]) => [t, +b.toFixed(3), +e.toFixed(3)])
+  }
+  fs.writeFileSync(new URL('src/timing.json', root), JSON.stringify(timing) + '\n')
   const total = Object.values(durations).reduce((n, d) => n + d.frames, 0)
   for (const [id, d] of Object.entries(durations)) console.log(id.padEnd(9), d.audioSeconds.toFixed(2) + 's audio', (d.frames / 30).toFixed(2) + 's scene')
   console.log('total', (total / 30).toFixed(2) + 's', total, 'frames')
