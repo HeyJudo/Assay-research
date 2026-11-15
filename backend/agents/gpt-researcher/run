@@ -13,7 +13,9 @@ from pathlib import Path
 
 model = json.loads((Path(__file__).parent / "agent.json").read_text(encoding="utf-8"))["models"][0]
 for k, v in {"RETRIEVER": "tavily", "FAST_LLM": f"openai:{model}", "SMART_LLM": f"openai:{model}",
-             "STRATEGIC_LLM": f"openai:{model}"}.items():
+             "STRATEGIC_LLM": f"openai:{model}",
+             # Reduced depth to fit free-tier quotas (defaults 3 and 5). Config only, through GPT Researcher's own env vars.
+             "MAX_ITERATIONS": "2", "MAX_SEARCH_RESULTS_PER_QUERY": "3"}.items():
     os.environ[k] = v
 # GPT Researcher resolves each page's host locally before fetching, and pool hosts do not resolve. The proxy serves
 # only pool URLs and 404s the rest, so skipping that check opens nothing.

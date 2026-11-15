@@ -13,7 +13,7 @@ def record(text, task_type="briefing"):
     return RunRecord(
         id="run_1", batch_id="b_1", agent_id="a", task_id="t", task_type=task_type,
         trap=None, repeat=1, status="done", started_at="2026-11-13T00:00:00Z", duration_s=1,
-        config=RunConfig(agent_version="1", models=["qwen3.8-27b"], prompt_hash="p",
+        config=RunConfig(agent_version="1", models=["gemini-3.5-flash"], prompt_hash="p",
                          pool_version="v1", trap_seed=None, fallback_used=False),
         output=RunOutput(text=text, abstained=False), steps=[], claims=[],
         metrics=RunMetrics(success=False, steps=0, tool_calls=0, tokens=0, cost_usd=0,
@@ -127,7 +127,7 @@ def test_briefing_grade_applies_claim_threshold_format_date_and_cost():
     task = Task(id="t", type="briefing", prompt="Brief me", as_of_date="2026-11-13",
                 answer=None, trap_twin=None, notes="")
     graded = graders.grade_run(record(BRIEF), task, POOL, [{
-        "model": "qwen3.8-27b", "input_tokens": 100, "output_tokens": 50
+        "model": "gemini-3.5-flash", "input_tokens": 100, "output_tokens": 50
     }], judge([{
         "text": "Acme launched Product X", "verdict": "supported", "source_url": "https://source.test",
         "source_quote": "Acme launched Product X on November 10."
@@ -141,7 +141,7 @@ def test_fact_and_unanswerable_success():
                 answer="1582", trap_twin=None, notes="")
     unans = Task(id="t", type="unanswerable", prompt="missing", as_of_date="2026-11-13",
                  answer="NOT_FOUND", trap_twin=None, notes="")
-    usage = [{"model": "qwen3.8-27b", "input_tokens": 10, "output_tokens": 1}]
+    usage = [{"model": "gemini-3.5-flash", "input_tokens": 10, "output_tokens": 1}]
     assert graders.grade_run(record("1582", "fact"), fact, POOL, usage, judge([])).metrics.success
     graded = graders.grade_run(record("Not found", "unanswerable"), unans, POOL, usage, judge([]))
     assert graded.metrics.success and graded.output.abstained and graded.metrics.abstention == "correct"
@@ -179,7 +179,7 @@ def test_failed_run_skips_judge_and_usage():
 def test_fact_abstention_and_trap_failures_skip_judge():
     fact = Task(id="t", type="fact", prompt="year", as_of_date="2026-11-13", answer="1582", trap_twin=None, notes="")
     unans = fact.model_copy(update={"type": "unanswerable", "answer": "NOT_FOUND"})
-    usage = [{"model": "qwen3.8-27b", "input_tokens": 1, "output_tokens": 1}]
+    usage = [{"model": "gemini-3.5-flash", "input_tokens": 1, "output_tokens": 1}]
     no_judge = lambda _: pytest.fail("judge called")
     assert graders.grade_run(record("Not found", "fact"), fact, POOL, usage, no_judge).metrics.abstention == "over_refusal"
     assert graders.grade_run(record("guess", "unanswerable"), unans, POOL, usage, no_judge).metrics.abstention == "wrong_answer"
@@ -192,7 +192,7 @@ def test_fact_abstention_and_trap_failures_skip_judge():
 
 def test_briefing_threshold_and_missing_section():
     task = Task(id="t", type="briefing", prompt="Brief me", as_of_date="2026-11-13", answer=None, trap_twin=None, notes="")
-    usage = [{"model": "qwen3.8-27b", "input_tokens": 1, "output_tokens": 1}]
+    usage = [{"model": "gemini-3.5-flash", "input_tokens": 1, "output_tokens": 1}]
     items = [{"text": "fact", "verdict": "supported", "source_url": "https://source.test", "source_quote": "Acme launched"}] * 3
     items += [{"text": "other", "verdict": "unsupported", "source_url": None, "source_quote": None}] * 2
     assert not graders.grade_run(record(BRIEF), task, POOL, usage, judge(items)).metrics.success
@@ -251,9 +251,9 @@ def test_agreement_matches_split_claim_without_using_human_label(monkeypatch):
 def test_switch_uses_observed_llm_models():
     task = Task(id="t", type="fact", prompt="year", as_of_date="2026-11-13", answer="1582", trap_twin=None, notes="")
     usage = [{"model": model, "input_tokens": 1, "output_tokens": 1}
-             for model in ("gemma-4-26b-a4b-it", "qwen3.8-27b")]
+             for model in ("gemini-3.5-flash-lite", "gemini-3.5-flash")]
     steps = [Step(i=i, t=i, kind="llm", detail="", model=model, phase="write", tokens=1, cost_usd=0)
-             for i, model in enumerate(("gemma-4-26b-a4b-it", "qwen3.8-27b"), 1)]
+             for i, model in enumerate(("gemini-3.5-flash-lite", "gemini-3.5-flash"), 1)]
     run = record("1582", "fact").model_copy(update={"agent_id": "briefing-cheap-first", "steps": steps})
     assert graders.grade_run(run, task, POOL, usage).metrics.switched
 

@@ -72,7 +72,7 @@ A run's step-by-step trace is built from the two places every research agent mus
 | Gateway | Bifrost (Docker / npx) |
 | Frontend | React, Vite, TypeScript, Tailwind CSS, shadcn/ui, Recharts |
 | Live updates | Server-Sent Events |
-| Models | Open models (Llama family) on free tiers for agents. An OpenAI GPT model as the judge |
+| Models | Gemini 3.5 Flash and Flash-Lite (Google AI Studio free tier) for agents. An OpenAI GPT model as the judge |
 | Deploy | One Docker image (`docker compose up`; Hugging Face Docker Spaces need PRO, see Deploy) |
 
 ## Getting started
@@ -161,7 +161,7 @@ Same pools, tasks and trap seeds for every agent. Answers verified in-pool by tw
 
 ## AI tool disclosure
 
-We build with AI-assisted development. Claude Code (Anthropic) helped with planning, the spec, documentation and code. Every change is reviewed and merged by a team member. Assay itself calls LLMs at runtime: open models as the agents under test and an OpenAI model as the judge, all through Bifrost.
+We build with AI-assisted development. Claude Code (Anthropic) helped with planning, the spec, documentation and code. Every change is reviewed and merged by a team member. Assay itself calls LLMs at runtime: Gemini models as the agents under test and an OpenAI model as the judge, all through Bifrost.
 
 ## Docs
 

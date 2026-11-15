@@ -1,1 +1,1 @@
-{"version":"1.0","models":["qwen3.8-27b"],"prompt_hash":"2a290879","name":"Briefing Agent: Evidence-gated","kind":"ours","description":"Checks each claim against its cited passage. Unsupported claims move to Not found or Uncertain."}
+{"version":"1.0","models":["gemini-3.5-flash"],"prompt_hash":"48df698d","name":"Briefing Agent: Evidence-gated","kind":"ours","description":"Checks each claim against its cited passage. Unsupported claims move to Not found or Uncertain."}

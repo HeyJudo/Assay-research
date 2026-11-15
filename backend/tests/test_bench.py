@@ -25,7 +25,7 @@ def bench_runs():
 
 def test_benchmark_tasks_only_never_practice():
     tasks = bench.task_ids()
-    assert len(tasks) == 16 and TASK in tasks  # PRD §13: the Nov 13 suite
+    assert len(tasks) == 11 and TASK in tasks  # PRD §13: the Nov 15 suite (twins + unanswerable)
     assert not any(t.startswith("practice") for t in tasks)
     with pytest.raises(SystemExit):
         bench.main(["--tasks", "practice-python3-year", "--dry-run"])

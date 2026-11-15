@@ -11,8 +11,8 @@ import urllib.request
 from datetime import date
 from pathlib import Path
 
-MAIN_MODEL = "qwen3.8-27b"
-SMALL_MODEL = "gemma-4-26b-a4b-it"
+MAIN_MODEL = "gemini-3.5-flash"
+SMALL_MODEL = "gemini-3.5-flash-lite"
 SECTIONS = ("Verified", "Uncertain", "Not found", "Open questions")
 URL_RE = re.compile(r"https?://[^\s)>\]]+")
 def prompt_hash(version: str) -> str:
@@ -64,7 +64,7 @@ def _sources(results: list[dict]) -> str:
     return "\n\n".join(
         f"SOURCE {i}\nURL: {item['url']}\nTITLE: {item.get('title', '')}\n"
         f"PUBLISHED: {item.get('published_date') or 'unknown'}\n"
-        f"TEXT: {(item.get('raw_content') or item.get('content') or '')[:6000]}"
+        f"TEXT: {(item.get('raw_content') or item.get('content') or '')[:2000]}"
         for i, item in enumerate(results, 1)
     )
 

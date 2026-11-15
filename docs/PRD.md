@@ -137,7 +137,7 @@ React app (Vite) ──HTTP/SSE──► FastAPI (api.py) ──► SQLite (assa
 | Deploy | **One Docker image** (FastAPI serves the built React app; Bifrost + proxy inside) → **Hugging Face Space (Docker)**, free | Serverless (Vercel) can't run long jobs or a proxy. Verify HF on Nov 13; fallback: run from a laptop on judging day + demo video |
 
 **Models (all through Bifrost):**
-- Agents under test: free open models. Main = `qwen3.8-27b` (Groq + Cerebras, Bifrost fails over between them). Small = `gemma-4-26b-a4b-it` (Gemini + OpenRouter free; weaker failover, both run on Google AI Studio). gpt-oss was rejected: it is an OpenAI model, like the judge. Every outside agent uses the **main** model so the comparison is fair.
+- Agents under test (superseded Nov 15, see §13): free open models. Main = `qwen3.8-27b` (Groq + Cerebras, Bifrost fails over between them). Small = `gemma-4-26b-a4b-it` (Gemini + OpenRouter free; weaker failover, both run on Google AI Studio). gpt-oss was rejected: it is an OpenAI model, like the judge. Every outside agent uses the **main** model so the comparison is fair.
 - Judge: **one OpenAI mini GPT model** (different family from the agents), paid from a separate OpenAI project with a **$10 cap**, also set as a Bifrost budget.
 - Rate limits: each teammate creates free keys; Bifrost load-balances across all of them and fails over between providers serving the same model.
 - **Fallback to a different model invalidates a run.** The run gets `fallback_used: true` and is re-run for the benchmark. In the live demo it's allowed but labeled.
@@ -253,5 +253,7 @@ All 6 screens, built first against fake run records in `web/src/fixtures/` · sl
 **Decided (Nov 13):** task suite in `data/tasks/`: 4 fact, 5 briefing (Maxim AI, Tavily, Nebius, Mistral AI, Cohere), 3 unanswerable, 4 trapped twins (2 fact + 2 briefing; 2 fake article + 2 hidden instruction), `as_of_date` 2026-11-13 · pools built once by `pool_builder.py`, never overwritten · each trap doc carries `planted`, the string graders match as a whole word for `trap_fell`.
 
 **Lead clarification (Nov 13):** the briefing date check uses parseable dates written in claims only; undated claims pass that check. Failed runs have zero recorded cost when usage is unavailable. The claim judge runs for completed briefing tasks only.
+
+**Decided (Nov 15):** free tiers could not carry the benchmark. Groq rejected the ~13k-token prompts (413), Gemma hit its per-minute quota after one call, OpenRouter's free pool returned 429, and Cerebras billed real money. Agents now use Google AI Studio's free tier: main = `gemini-3.5-flash`, small = `gemini-3.5-flash-lite` (closed models, a change from open models; the judge stays OpenAI, a different family). One provider, so no Bifrost failover · to fit free quotas, decided before the benchmark ran and not tuned on its results: our agent sends at most 2,000 characters per source (was 6,000, same for all 3 versions), GPT Researcher runs with `MAX_ITERATIONS=2` and `MAX_SEARCH_RESULTS_PER_QUERY=3` through its own env vars (code unchanged), and the benchmark runs 11 tasks: the 4 trapped twins, their 4 clean twins, and the 3 unanswerable tasks. The 5 tasks without a twin stay in `data/tasks/` but are not run. Run-slot Bifrost budgets are $20/day.
 
 **Still open:** repo name (suggest `assay-research`).

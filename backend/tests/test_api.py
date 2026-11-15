@@ -147,7 +147,7 @@ def test_agents_read_agent_json(client, tmp_path, monkeypatch):
 
 def test_tasks_are_the_benchmark_suite_without_practice(client):
     body = client.get("/api/tasks").json()
-    assert len(body) == 16 and not any(t["id"].startswith("practice") for t in body)
+    assert len(body) == 11 and not any(t["id"].startswith("practice") for t in body)
     hinton = next(t for t in body if t["id"] == "fact-hinton-university-trap")
     assert (hinton["type"], hinton["answer"]) == ("fact", "1582")  # from data/tasks/fact-hinton-university-trap.json
 

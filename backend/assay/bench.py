@@ -24,7 +24,11 @@ def agent_ids() -> list[str]:
 
 
 def task_ids() -> list[str]:
-    return [f.stem for f in sorted((runner.DATA / "tasks").glob("*.json"))]
+    """The 11-task suite (PRD §13, Nov 15): trapped twins, their clean twins, and the unanswerable tasks.
+    Tasks without a twin stay in data/tasks but are not run, to fit free-tier quotas."""
+    tasks = [json.loads(f.read_text("utf-8")) for f in sorted((runner.DATA / "tasks").glob("*.json"))]
+    twins = {t["trap_twin"] for t in tasks if t.get("trap_twin")}
+    return [t["id"] for t in tasks if t["type"] == "unanswerable" or t.get("trap_twin") or t["id"] in twins]
 
 
 def task_trap(task_id: str):
