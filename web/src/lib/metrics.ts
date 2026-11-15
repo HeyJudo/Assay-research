@@ -1,7 +1,7 @@
 import type { LeaderboardRow, RunSummary } from '@/types'
 
-export const percent = (value: number | null | undefined) => value == null || !Number.isFinite(value) ? '—' : `${Math.round(value * 100)}%`
-export const money = (value: number | null | undefined) => value == null || !Number.isFinite(value) ? '—' : `${value < 0 ? '-' : ''}$${Math.abs(value).toFixed(4)}`
+export const percent = (value: number | null | undefined) => value == null || !Number.isFinite(value) ? 'N/A' : `${Math.round(value * 100)}%`
+export const money = (value: number | null | undefined) => value == null || !Number.isFinite(value) ? 'N/A' : `${value < 0 ? '-' : ''}$${Math.abs(value).toFixed(4)}`
 export { agentLabel } from './agent-names.ts'
 export const colors = ['var(--chart-1)', 'var(--chart-2)', 'var(--chart-3)', 'var(--chart-4)']
 export type Weights = { accuracy: number; cost: number; trap: number; honesty: number }

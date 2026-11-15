@@ -244,6 +244,8 @@ All 6 screens, built first against fake run records in `web/src/fixtures/` · sl
 
 ## 13. Decisions log
 
+**Decided (Nov 15, UI refresh):** navigation is Home, Run, Leaderboard, Briefing Agent; Compare is folded into Results, the final Run stage, and `/compare` redirects to Results.
+
 **Decided by the team (Nov 9):** Assay merged with the 3-version Briefing Agent · roles: Jude platform, one backend, one frontend · live Run button for judges · deploy it · ~$10 of OpenAI for the judge, everything else free · open models for agents · screens and flow in §5 · no landing page · no quiz, sliders stay · sponsor briefings as part of the suite.
 
 **Claude's calls (change if you disagree):** Python/FastAPI/SQLite backend · Vite (not Next.js) · SSE over WebSockets · one Docker image on a Hugging Face Space · list-price cost · fallback-to-other-model invalidates a run · briefing success definition (§8) · batch limits (≤3 agents, 1 task, 3 repeats) · GPT Researcher as the must-have outside agent · day-by-day split in §11 · proxy blocks all non-pool URLs · one judge call per run · trap mechanics (§6) · which tasks feed which metric (§8).
