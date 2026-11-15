@@ -1,0 +1,27 @@
+{
+  "name": "assay-demo-video",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "studio": "remotion studio",
+    "render": "remotion render AssayDemo out/assay-demo.mp4",
+    "facts": "node tools/check-facts.mjs",
+    "voice": "node tools/voice.mjs",
+    "capture": "node tools/capture.mjs"
+  },
+  "dependencies": {
+    "@fontsource-variable/geist": "^5.3.0",
+    "@fontsource/fira-code": "^5.3.0",
+    "@fontsource/oxanium": "^5.3.0",
+    "@remotion/cli": "^4.0.543",
+    "@remotion/media-utils": "^4.0.543",
+    "puppeteer-core": "^25.17.0",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "remotion": "^4.0.543"
+  },
+  "devDependencies": {
+    "@types/react": "^19.3.0",
+    "typescript": "^7.0.2"
+  }
+}

@@ -1,0 +1,7 @@
+node_modules/
+out/
+.capture/
+public/audio/
+public/clips/
+public/sfx/
+public/music.mp3
