@@ -75,7 +75,7 @@ export function ResultsScene() {
   return (
     <Screen clip="results" url="localhost · Assay / Leaderboard" step={2}
       segments={[
-        { from: m.findings - 0.7, to: m.leaderboard - 0.3, at: 0, dur: lb },
+        { from: m.findings - 0.7, to: 7.1, at: 0, dur: lb }, // Home leaves at ~7.2 s of the clip; leaderboard settles at m.leaderboard
         { from: m.leaderboard, to: m.priorities - 0.2, at: lb, dur: drag - lb },
         { from: m.priorities - 0.2, to: m.reordered + 1, at: drag, dur: after - drag },
         { from: m.reordered + 1, to: m.reordered + 1 + len(S) - after, at: after, dur: len(S) - after },
