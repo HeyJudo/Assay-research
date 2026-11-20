@@ -122,6 +122,7 @@ class BriefRequest(BaseModel):
     subject: str = Field(min_length=1, max_length=150)
     meeting_time: str
     version: str
+    passcode: str
 
     @field_validator("meeting_time")
     @classmethod

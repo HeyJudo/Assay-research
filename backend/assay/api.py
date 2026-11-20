@@ -117,8 +117,15 @@ BATCH_LOCK = threading.Lock()
 BRIEF_LOCK = threading.Lock()  # live briefs share run slot 1 and the process environment
 
 
+def check_passcode(passcode: str) -> None:
+    want = os.environ.get("RUN_PASSCODE", "")
+    if not want or not hmac.compare_digest(passcode.encode(), want.encode()):
+        raise HTTPException(403, "wrong passcode")
+
+
 @app.post("/api/brief")
 def create_brief(req: BriefRequest):
+    check_passcode(req.passcode)
     version = req.version.removeprefix("briefing-")
     if version not in {"baseline", "cheap-first", "evidence-gated"}:
         raise HTTPException(422, "unknown briefing version")
@@ -203,9 +210,7 @@ def create_brief(req: BriefRequest):
 
 @app.post("/api/batches")
 def create_batch(req: BatchRequest) -> BatchCreated:
-    want = os.environ.get("RUN_PASSCODE", "")
-    if not want or not hmac.compare_digest(req.passcode.encode(), want.encode()):
-        raise HTTPException(403, "wrong passcode")
+    check_passcode(req.passcode)
     if len(set(req.agents)) != len(req.agents):
         raise HTTPException(422, "each agent once")
     task = runner.find_task(req.task_id)
