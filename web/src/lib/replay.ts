@@ -20,7 +20,7 @@ export function recordedTraps(records: RunRecord[], taskId: string): (Trap | nul
 
 export function recordedBriefs(records: RunRecord[], version: string): RunRecord[] {
   const best = new Map<string, RunRecord>()
-  const rank = (r: RunRecord) => r.repeat * 2 + (r.status === 'done' ? 0 : 1)
+  const rank = (r: RunRecord) => (r.status === 'done' ? 0 : 10) + r.repeat  // a done run beats any failed one
   for (const r of records) {
     if (r.agent_id !== version || r.task_type !== 'briefing' || r.trap !== null) continue
     const prev = best.get(r.task_id)

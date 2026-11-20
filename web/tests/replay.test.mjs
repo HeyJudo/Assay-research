@@ -44,3 +44,9 @@ test('recordedBriefs excludes traps, keeps lowest repeat, prefers done', () => {
   ]
   assert.deepEqual(recordedBriefs(records, 'v').map(r => r.id), ['b1done', 'b2r1'])
 })
+
+test('recordedBriefs prefers a done run at a later repeat over an error at repeat 1', () => {
+  const b = o => rec({ agent_id: 'v', task_type: 'briefing', task_id: 'b1', ...o })
+  const records = [b({ repeat: 1, status: 'error' }), b({ repeat: 2, id: 'done2' })]
+  assert.deepEqual(recordedBriefs(records, 'v').map(r => r.id), ['done2'])
+})
