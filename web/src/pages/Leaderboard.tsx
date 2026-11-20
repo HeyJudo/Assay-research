@@ -2,12 +2,12 @@ import { useState } from 'react'
 import { Link } from 'react-router'
 import { motion, useReducedMotion } from 'motion/react'
 import { ArrowRight, ChevronDown } from 'lucide-react'
-import { CartesianGrid, ErrorBar, ResponsiveContainer, Scatter, ScatterChart, Tooltip, XAxis, YAxis, ZAxis } from 'recharts'
+import { CartesianGrid, ResponsiveContainer, Scatter, ScatterChart, Tooltip, XAxis, YAxis, ZAxis } from 'recharts'
 import { Button } from '@/components/ui/button'
 import { Slider } from '@/components/ui/slider'
 import { LoadState } from '@/components/shared'
 import { data, sampleData } from '@/lib/data'
-import { chartPoint } from '@/lib/leaderboard-chart'
+import { accuracyTop, chartPoint, costAxis } from '@/lib/leaderboard-chart'
 import { useData } from '@/lib/use-data'
 import { agentLabel, colors, defaultWeights, money, percent, rankRows, type Weights } from '@/lib/metrics'
 import './leaderboard.css'
@@ -37,6 +37,9 @@ export default function Leaderboard() {
   }[top.key]
   const color = (id: string) => colors[Math.max(0, sourceRows.findIndex(row => row.agent_id === id)) % colors.length]
   const points = rows.map(row => ({ row, point: chartPoint(row) })).filter(item => item.point !== null)
+  const axis = costAxis(points.map(({ point }) => point!.cost))
+  const yTop = accuracyTop(points.map(({ point }) => point!.spread ? point!.accuracy + point!.spread[1] : point!.accuracy))
+  const atDefault = (Object.keys(defaultWeights) as (keyof Weights)[]).every(k => weights[k] === defaultWeights[k])
   const missingSpread = points.some(({ point }) => !point?.spread)
 
   return <div className="leaderboard-page">
@@ -47,7 +50,7 @@ export default function Leaderboard() {
         <Slider id={`slider-${key}`} aria-labelledby={`w-${key}`} min={0} max={100} step={5} value={[weights[key]]} onValueChange={values => setWeights(previous => ({ ...previous, [key]: values[0] }))} />
         <p>{hint}</p>
       </div>)}
-      <Button variant="outline" onClick={() => setWeights({ ...defaultWeights })}>Reset to default</Button>
+      <Button variant="outline" disabled={atDefault} onClick={() => setWeights({ ...defaultWeights })}>Reset to default</Button>
     </aside>
     <div className="leaderboard-content">
       <section className="leaderboard-recommendation" aria-live="polite" aria-atomic="true">
@@ -64,24 +67,23 @@ export default function Leaderboard() {
             </motion.tr>)}</tbody>
           </table>
         </div>
-        <p className="leaderboard-table-note">Open an agent to compare it head to head. {sampleData ? 'Sample aggregates.' : 'Benchmark aggregates.'} Run counts and the remaining metrics are under More.</p>
+        <p className="leaderboard-table-note">Open an agent to compare it head to head. {sampleData ? 'Sample aggregates.' : 'Benchmark aggregates.'}</p>
       </section>
       <motion.section className="leaderboard-chart-section" initial={reduced ? false : { opacity: 0, y: 16 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, amount: .15 }}>
-        <div><h2>Cost against accuracy</h2><p>Up and to the left is better. Each line shows how much accuracy moved between repeats.</p></div>
+        <div><h2>Cost against accuracy</h2><p>Up and to the left is better. Cost is on a log scale. A vertical line shows the lowest and highest accuracy across repeats.</p></div>
         <div className="leaderboard-chart-panel">
           {points.length ? <div className="leaderboard-chart" role="img" aria-label="Cost per correct answer against accuracy. Spread bars show observed minimum and maximum accuracy across repeats. Exact values are in each agent's More section.">
             <ResponsiveContainer width="100%" height={290} minWidth={0} initialDimension={{ width: 600, height: 290 }}><ScatterChart margin={{ top: 20, right: 16, bottom: 16, left: -16 }}>
               <CartesianGrid stroke="var(--border)" strokeDasharray="4 5" vertical={false} />
-              <XAxis type="number" dataKey="cost" name="Cost / correct" domain={['auto', 'auto']} tickFormatter={v => `$${Number(v).toFixed(3)}`} tick={{ fill: 'var(--muted-foreground)', fontSize: 11, fontFamily: 'Fira Code' }} axisLine={{ stroke: 'var(--input)' }} tickLine={false} />
-              <YAxis type="number" dataKey="accuracy" name="Accuracy" domain={[0, 100]} tickFormatter={v => `${v}%`} tick={{ fill: 'var(--muted-foreground)', fontSize: 11, fontFamily: 'Fira Code' }} tickLine={false} axisLine={{ stroke: 'var(--input)' }} />
+              <XAxis type="number" dataKey="cost" name="Cost / correct" scale={axis.scale} domain={axis.domain} ticks={axis.ticks} allowDataOverflow tickFormatter={v => `$${Number(v).toFixed(3)}`} tick={{ fill: 'var(--muted-foreground)', fontSize: 12, fontFamily: 'Fira Code' }} axisLine={{ stroke: 'var(--input)' }} tickLine={false} />
+              <YAxis type="number" dataKey="accuracy" name="Accuracy" domain={[0, yTop]} tickFormatter={v => `${v}%`} tick={{ fill: 'var(--muted-foreground)', fontSize: 12, fontFamily: 'Fira Code' }} tickLine={false} axisLine={{ stroke: 'var(--input)' }} />
               <ZAxis range={[110, 110]} />
               <Tooltip cursor={{ strokeDasharray: '3 3' }} content={({ payload }) => { const point = payload?.find(item => item.payload?.agent)?.payload; return point ? <div className="leaderboard-chart-tooltip"><strong>{point.agent}</strong><p>{percent(point.accuracy / 100)} accuracy</p><p>{money(point.cost)} / correct</p></div> : null }} />
-              {points.map(({ row, point }) => <Scatter key={row.agent_id} name={agentLabel(row.agent_id)} data={[{ ...point, agent: agentLabel(row.agent_id) }]} fill={color(row.agent_id)} isAnimationActive={false}>
-                {point?.spread && <ErrorBar dataKey="spread" direction="y" width={8} strokeWidth={1.5} stroke={color(row.agent_id)} />}
-              </Scatter>)}
+              {points.map(({ row, point }) => point?.spread && <Scatter key={`${row.agent_id}-range`} data={[{ cost: point.cost, accuracy: point.accuracy - point.spread[0] }, { cost: point.cost, accuracy: point.accuracy + point.spread[1] }]} line={{ stroke: color(row.agent_id), strokeWidth: 2 }} shape={({ cx, cy }: { cx?: number; cy?: number }) => <line x1={(cx ?? 0) - 5} x2={(cx ?? 0) + 5} y1={cy} y2={cy} stroke={color(row.agent_id)} strokeWidth={2} />} tooltipType="none" legendType="none" isAnimationActive={false} />)}
+              {points.map(({ row, point }) => <Scatter key={row.agent_id} name={agentLabel(row.agent_id)} data={[{ ...point, agent: agentLabel(row.agent_id) }]} fill={color(row.agent_id)} isAnimationActive={false} />)}
             </ScatterChart></ResponsiveContainer>
           </div> : <p>No measured accuracy and cost pairs are available for this chart.</p>}
-          <p className="leaderboard-axis-label mono">cost per correct answer (USD)</p>
+          <p className="leaderboard-axis-label mono">cost per correct answer (USD, log scale)</p>
           <div className="leaderboard-chart-legend">{rows.map(row => <Link to={`/results?scope=full&a=${encodeURIComponent(row.agent_id)}`} key={row.agent_id}><i style={{ background: color(row.agent_id) }} />{agentLabel(row.agent_id)}{!chartPoint(row) && ' (unavailable)'}</Link>)}</div>
           {missingSpread && <p className="fine-print">Some repeat bounds are unavailable. Those agents have a dot without a spread bar.</p>}
         </div>

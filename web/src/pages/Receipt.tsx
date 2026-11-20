@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useSearchParams } from 'react-router'
-import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
+import { AnimatePresence, motion, useReducedMotion, useScroll } from 'motion/react'
 import { Dialog } from 'radix-ui'
 import { AlertCircle, ArrowLeftRight, Check, ChevronDown, Cpu, Download, ExternalLink, FileText, ReceiptText, Search, X } from 'lucide-react'
 import { Sheet, SheetClose, SheetDescription, SheetTitle } from '@/components/ui/sheet'
@@ -26,6 +26,16 @@ function exportRun(run: RunRecord) {
   const anchor = document.createElement('a')
   anchor.href = url; anchor.download = `${run.id}.json`; anchor.click()
   window.setTimeout(() => URL.revokeObjectURL(url), 1000)
+}
+
+function Disclosure({ label, children }: { label: string; children: ReactNode }) {
+  const [open, setOpen] = useState(false)
+  return <div className="receipt-details">
+    <button type="button" className="receipt-toggle" aria-expanded={open} onClick={() => setOpen(value => !value)}>
+      <motion.span className="receipt-chevron" initial={false} animate={{ rotate: open ? 180 : 0 }}><ChevronDown size={16} aria-hidden="true" /></motion.span>{label}
+    </button>
+    <AnimatePresence initial={false}>{open && <motion.div key="content" style={{ overflow: 'hidden' }} initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }}>{children}</motion.div>}</AnimatePresence>
+  </div>
 }
 
 function ReceiptPaper({ id }: { id: string }) {
@@ -58,7 +68,8 @@ function ReceiptPaper({ id }: { id: string }) {
   const run = currentRun ?? initialRun
   const brief = run.task_id === 'brief-live'  // live briefs are one-off and never graded
   const passed = run.status === 'done' && (brief || run.metrics.success)
-  const outcome = run.status === 'running' ? 'Running' : run.status === 'error' ? 'Error' : run.status === 'budget_exceeded' ? 'Budget exceeded' : brief ? 'Done' : passed ? 'Passed' : 'Failed'
+  const trapped = run.status === 'done' && !brief && !run.metrics.success && !!run.metrics.trap_fell
+  const outcome = trapped ? 'Failed: fell for the planted trap' : run.status === 'running' ? 'Running' : run.status === 'error' ? 'Error' : run.status === 'budget_exceeded' ? 'Budget exceeded' : brief ? 'Done' : passed ? 'Passed' : 'Failed'
   const supported = run.claims.filter(claim => claim.verdict === 'supported').length
   const task = tasks.find(task => task.id === run.task_id)
   const phaseCosts = run.steps.reduce<Record<string, number>>((groups, step) => { groups[step.phase] = (groups[step.phase] ?? 0) + step.cost_usd; return groups }, {})
@@ -71,14 +82,14 @@ function ReceiptPaper({ id }: { id: string }) {
     <div className="receipt-paper-window">
       <motion.article className="receipt-paper" {...print} aria-label={`${agentLabel(run.agent_id)} run receipt`}>
         <div className="receipt-paper-body">
-          <motion.div className={`receipt-stamp ${passed ? 'passed' : run.status === 'running' ? 'working' : 'failed'}`} aria-hidden="true" initial={reduced ? false : { opacity: 0, scale: 1.7, rotate: -12 }} animate={{ opacity: 1, scale: 1, rotate: -12 }} transition={{ ...spring, delay: reduced ? 0 : .65 }}>{outcome.toUpperCase()}</motion.div>
+          <motion.div className={`receipt-stamp ${passed ? 'passed' : run.status === 'running' ? 'working' : 'failed'}`} aria-hidden="true" initial={reduced ? false : { opacity: 0, scale: 1.7, rotate: -12 }} animate={{ opacity: 1, scale: 1, rotate: -12 }} transition={{ ...spring, delay: reduced ? 0 : .65 }}>{trapped ? 'TRAPPED' : outcome.toUpperCase()}</motion.div>
           <motion.header className="receipt-paper-heading" {...row}><ReceiptText size={28} aria-hidden="true" /><div>ASSAY</div><p>{run.id}</p><time dateTime={run.started_at}>{Number.isNaN(Date.parse(run.started_at)) ? run.started_at : new Date(run.started_at).toISOString().replace('T', ' ').replace(/\.\d+Z$/, ' UTC')}</time></motion.header>
           <motion.section className="receipt-print-section" {...row}>
             <motion.div className="receipt-line" {...row}><span className="receipt-label">AGENT</span><i /><strong>{agentLabel(run.agent_id)} v{run.config.agent_version}</strong></motion.div>
             {!brief && <motion.div className="receipt-line" {...row}><span className="receipt-label">REPEAT</span><i /><span>{run.repeat} of 3</span></motion.div>}
             <motion.div className="receipt-line" {...row}><span className="receipt-label">RESULT</span><i /><strong className={passed ? 'receipt-good' : 'receipt-bad'}>{outcome}</strong></motion.div>
             <p className="receipt-task">{task?.prompt ?? run.task_id}</p>
-            {run.metrics.trap_fell && <p className="receipt-bad">Fell for the planted trap.</p>}
+            
             {run.config.fallback_used && <p className="receipt-bad">Fallback model used. Flagged for review.</p>}
           </motion.section>
           <motion.section className="receipt-print-section" {...row}><h3 className="receipt-label">WHAT IT DID · {run.steps.length} STEPS</h3>{stepKinds.map(({ kind, label, icon: Icon }) => {
@@ -86,14 +97,14 @@ function ReceiptPaper({ id }: { id: string }) {
             if (!steps.length) return null
             return <div key={kind}><motion.div className="receipt-line" {...row}><Icon size={14} /><span>{steps.length} × {label}</span><i /><span>{kind === 'switch' ? `at ${steps[0].t.toFixed(1)}s` : money(steps.reduce((sum, step) => sum + step.cost_usd, 0))}</span></motion.div>{kind === 'switch' && steps.map(step => <p className="receipt-switch-note" key={step.i}>{step.detail}</p>)}</div>
           })}{!run.steps.length && <p className="receipt-muted">No steps recorded.</p>}
-            {!!run.steps.length && <details className="receipt-details"><summary><ChevronDown size={14} />Show all {run.steps.length} steps</summary><ol className="receipt-steps">{run.steps.map(step => <li key={step.i}><div><time>{step.t.toFixed(1)}s</time><strong>{stepKinds.find(kind => kind.kind === step.kind)?.label ?? step.kind}</strong><span>{step.detail}</span></div><p>{step.phase}{step.model ? ` · ${step.model}` : ''} · {step.tokens.toLocaleString()} tokens · {money(step.cost_usd)}</p></li>)}</ol></details>}
+            {!!run.steps.length && <Disclosure label={`Show all ${run.steps.length} steps`}><ol className="receipt-steps">{run.steps.map((step, n) => <motion.li key={step.i} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: Math.min(n, 8) * .045 }}><div><time>{step.t.toFixed(1)}s</time><strong>{stepKinds.find(kind => kind.kind === step.kind)?.label ?? step.kind}</strong><span>{step.detail}</span></div><p>{step.phase}{step.model ? ` · ${step.model}` : ''} · {step.tokens.toLocaleString()} tokens · {money(step.cost_usd)}</p></motion.li>)}</ol></Disclosure>}
           </motion.section>
           <motion.section className="receipt-print-section" {...row}><h3 className="receipt-label">PAID TO</h3>{Object.entries(run.metrics.cost_by_model).length ? Object.entries(run.metrics.cost_by_model).map(([model, cost]) => <div className="receipt-line" key={model}><span>{model}</span><i /><span>{money(cost)}</span></div>) : <p className="receipt-muted">No model-level charges recorded.</p>}
-            <details className="receipt-details"><summary><ChevronDown size={14} />Cost by phase</summary>{Object.entries(phaseCosts).map(([phase, cost]) => <div className="receipt-line" key={phase}><span>{phase}</span><i /><span>{money(cost)}</span></div>)}<p className="receipt-muted">Derived from steps. May differ from the recorded total when accounting is incomplete.</p></details>
+            <Disclosure label="Cost by phase">{Object.entries(phaseCosts).map(([phase, cost]) => <div className="receipt-line" key={phase}><span>{phase}</span><i /><span>{money(cost)}</span></div>)}<p className="receipt-muted">Derived from steps. May differ from the recorded total when accounting is incomplete.</p></Disclosure>
             <div className="receipt-total"><motion.div className="receipt-line" {...row}><strong>TOTAL</strong><i /><strong>{money(run.metrics.cost_usd)}</strong></motion.div><motion.div className="receipt-line receipt-muted" {...row}><span>{run.duration_s == null ? 'Time unavailable' : `${run.duration_s.toFixed(1)} s`}</span><i /><span>{run.metrics.tokens.toLocaleString()} tokens</span></motion.div></div>
           </motion.section>
           <motion.section className="receipt-print-section" {...row}><h3 className="receipt-label">CLAIMS CHECKED · {supported} OF {run.claims.length} SUPPORTED</h3><div className="receipt-claims">{run.claims.map((claim, index) => <motion.article key={index} className={`receipt-claim verdict-${claim.verdict}`} {...row}>{claim.verdict === 'supported' ? <Check size={16} /> : <AlertCircle size={16} />}<div><span className="receipt-verdict">{claim.verdict.replaceAll('_', ' ')}</span><h4>{claim.text}</h4>{claim.source_quote ? <blockquote>&gt; “{claim.source_quote}”</blockquote> : <p className="receipt-muted">No source quote recorded. This claim is not verified by a passage.</p>}{safeUrl(claim.source_url) ? <a href={safeUrl(claim.source_url)!} target="_blank" rel="noreferrer">{claim.source_url}<ExternalLink size={12} /></a> : <p className="receipt-muted">{claim.source_url ? `Recorded source: ${claim.source_url}` : 'No source link recorded.'}</p>}</div></motion.article>)}</div>{!run.claims.length && <p className="receipt-muted">No claim verdicts recorded. Demo runs do not invent citation evidence.</p>}<p className="receipt-muted receipt-claim-share">Supported share: {percent(run.metrics.claims_supported_pct)}</p></motion.section>
-          <motion.section className="receipt-print-section" {...row}><details className="receipt-details"><summary><ChevronDown size={14} />Agent output</summary><BriefText text={run.output.text || 'No output recorded.'} /></details><p className="receipt-muted">Abstained: {run.output.abstained ? 'yes' : 'no'} · Abstention grade: {run.metrics.abstention?.replaceAll('_', ' ') ?? 'not applicable'}</p></motion.section>
+          <motion.section className="receipt-print-section" {...row}><Disclosure label="Agent output"><BriefText text={run.output.text || 'No output recorded.'} /></Disclosure><p className="receipt-muted">Abstained: {run.output.abstained ? 'yes' : 'no'} · Abstention grade: {run.metrics.abstention?.replaceAll('_', ' ') ?? 'not applicable'}</p></motion.section>
           <motion.footer className="receipt-print-section receipt-config" {...row}><p>prompt {run.config.prompt_hash} · pool {run.config.pool_version}</p><p>{run.trap?.replaceAll('_', ' ') ?? 'no trap'} · seed {run.config.trap_seed ?? 'none'} · {run.config.fallback_used ? 'fallback used' : 'no fallback'}</p><p>Models: {run.config.models.length ? run.config.models.join(' → ') : 'none recorded'}</p><p>{run.metrics.steps} steps · {run.metrics.tool_calls} tool calls</p><div className="receipt-barcode" aria-hidden="true" /><p className="receipt-barcode-id">{run.id}</p></motion.footer>
         </div>
       </motion.article><div className="receipt-zig" aria-hidden="true" />
@@ -115,10 +126,17 @@ export default function Receipt() {
   </Sheet>
 }
 
+function ScrollBar({ container }: { container: React.RefObject<HTMLElement | null> }) {
+  const { scrollYProgress } = useScroll({ container })
+  return <motion.div className="receipt-progress" aria-hidden="true" style={{ scaleX: scrollYProgress }} />
+}
+
 function FragmentWithReceipt({ id, reduced, close, captureOpener, restoreFocus }: { id: string; reduced: boolean; close: () => void; captureOpener: () => void; restoreFocus: () => void }) {
+  const scroller = useRef<HTMLElement | null>(null)
   return <>
     <Dialog.Overlay forceMount asChild><motion.div className="receipt-scrim" initial={reduced ? false : { opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0, pointerEvents: 'none' }} transition={{ duration: reduced ? 0 : .2 }} onClick={close} /></Dialog.Overlay>
-    <Dialog.Content forceMount asChild onOpenAutoFocus={captureOpener} onCloseAutoFocus={event => { event.preventDefault(); restoreFocus() }}><motion.aside className="receipt-sheet" initial={reduced ? false : { x: '100%' }} animate={{ x: 0 }} exit={{ x: reduced ? 0 : '100%', opacity: reduced ? 0 : 1, pointerEvents: 'none' }} transition={reduced ? { duration: 0 } : spring}>
+    <Dialog.Content forceMount asChild onOpenAutoFocus={captureOpener} onCloseAutoFocus={event => { event.preventDefault(); restoreFocus() }}><motion.aside className="receipt-sheet" ref={scroller} initial={reduced ? false : { x: '100%' }} animate={{ x: 0 }} exit={{ x: reduced ? 0 : '100%', opacity: reduced ? 0 : 1, pointerEvents: 'none' }} transition={reduced ? { duration: 0 } : spring}>
+      <div className="receipt-progress-rail"><ScrollBar container={scroller} /></div>
       <div className="receipt-sheet-header"><SheetTitle>Run receipt</SheetTitle><SheetClose asChild><Button variant="ghost" size="icon" aria-label="Close receipt"><X size={20} /></Button></SheetClose></div><SheetDescription className="sr-only">Every recorded step, cost, claim verdict and source for this research run.</SheetDescription><ReceiptPaper id={id} />
     </motion.aside></Dialog.Content>
   </>
