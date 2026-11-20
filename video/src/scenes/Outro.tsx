@@ -1,5 +1,5 @@
 import { AbsoluteFill, Img, interpolate, staticFile, useCurrentFrame, useVideoConfig } from 'remotion'
-import { C, F, REPO, TEAM } from '../brand'
+import { C, F, REPO, TEAM, TEAM_NAME } from '../brand'
 import { Logo } from '../ui/Logo'
 import { Bg, Dashed, Paper, Sfx, clamp, cue, easeOut, useIn, useRamp } from '../ui/kit'
 
@@ -7,10 +7,10 @@ export function Outro() {
   const frame = useCurrentFrame(), { durationInFrames } = useVideoConfig()
   const dont = cue('outro', "don't"), check = cue('outro', 'check')
   const paperIn = useIn(0, { damping: 20 })
-  const swap = check + 48
+  const swap = check + 34
   const out = useRamp(swap, swap + 16)
-  const lockup = useIn(swap + 30), repo = useIn(swap + 44)
-  const fade = interpolate(frame, [durationInFrames - 20, durationInFrames], [0, 1], clamp)
+  const lockup = useIn(swap + 24), team = useIn(swap + 34), repo = useIn(swap + 44)
+  const fade = interpolate(frame, [durationInFrames - 12, durationInFrames], [0, 1], clamp)
   const line = (at: number) => interpolate(frame, [at, at + 12], [0, 1], { ...clamp, easing: easeOut })
 
   return (
@@ -37,9 +37,12 @@ export function Outro() {
             <span style={{ width: 2, height: 40, background: C.line }} />
             <Img src={staticFile('brand/bifrost.png')} style={{ height: 44 }} />
           </div>
+          <div style={{ textAlign: 'center', opacity: team, transform: `translateY(${(1 - team) * 20}px)` }}>
+            <div style={{ fontFamily: F.head, fontWeight: 700, fontSize: 40, color: C.text }}>Team {TEAM_NAME}</div>
+            <div style={{ fontFamily: F.body, fontSize: 30, color: C.muted, marginTop: 8 }}>{TEAM.join('  ·  ')}</div>
+          </div>
           <div style={{ textAlign: 'center', opacity: repo, transform: `translateY(${(1 - repo) * 20}px)` }}>
-            <div style={{ fontFamily: F.body, fontSize: 30, color: C.text }}>{TEAM.length ? TEAM.join('  ·  ') : 'Team names TBD'}</div>
-            <div style={{ fontFamily: F.mono, fontSize: 30, color: C.accent, marginTop: 14 }}>{REPO}</div>
+            <div style={{ fontFamily: F.mono, fontSize: 30, color: C.accent }}>{REPO}</div>
             <div style={{ fontFamily: F.mono, fontSize: 20, color: C.muted, marginTop: 14, letterSpacing: 1.5 }}>GLOBAL AI HACKATHON 2026 · BIFROST PS02 + TAVILY PS05</div>
           </div>
         </AbsoluteFill>

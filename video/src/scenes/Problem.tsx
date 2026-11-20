@@ -1,7 +1,7 @@
 import React from 'react'
 import { AbsoluteFill, interpolate, useCurrentFrame } from 'remotion'
 import { C, F } from '../brand'
-import { Bg, Sfx, clamp, cue, useIn, useRamp } from '../ui/kit'
+import { Bg, Sfx, clamp, cue, useIn } from '../ui/kit'
 
 function Card({ at, title, children, dim }: { at: number; title: string; children: React.ReactNode; dim: number }) {
   const s = useIn(at, { damping: 16, mass: 0.7 })
@@ -30,44 +30,38 @@ function Row({ at, label, ok }: { at: number; label: string; ok: boolean }) {
 
 export function Problem() {
   const frame = useCurrentFrame()
-  const wrong = cue('problem', 'wrong'), run = cue('problem', 'run'), diff = cue('problem', 'different'), nobody = cue('problem', 'nobody'), so = cue('problem', 'so')
-  const flip = interpolate(frame, [wrong, wrong + 6], [0, 1], clamp)
-  const dim = useRamp(so - 6, so + 10)
-  const q = useIn(so + 4)
-  const scramble = frame < nobody + 50 ? String(Math.floor((Math.sin(frame * 1.7) * 0.5 + 0.5) * 9999)).padStart(4, '0') : '????'
+  const run = cue('problem', 'run'), diff = cue('problem', 'different'), fool = cue('problem', 'fool'), nobody = cue('problem', 'nobody'), cost = cue('problem', 'cost')
+  const flip = interpolate(frame, [fool, fool + 6], [0, 1], clamp)
+  const q = useIn(cost, { damping: 10, mass: 0.5, stiffness: 180 })
 
   return (
     <Bg>
       <AbsoluteFill style={{ alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 44 }}>
-        <Card at={2} title="SOUNDS SURE" dim={dim}>
+        <Card at={2} title="SOUNDS RIGHT" dim={0}>
           <div style={{ fontSize: 30, lineHeight: 1.4 }}>“The company was founded by two researchers and is profitable.”</div>
-          <div style={{ marginTop: 'auto', alignSelf: 'flex-start', fontFamily: F.mono, fontSize: 26, fontWeight: 500, padding: '10px 22px', borderRadius: 999,
+          <div style={{ marginTop: 'auto', alignSelf: 'flex-start', fontFamily: F.mono, fontSize: 24, fontWeight: 500, padding: '10px 22px', borderRadius: 999,
             color: flip > 0.5 ? C.danger : C.ok, background: flip > 0.5 ? C.dangerBg : C.okBg, transform: `rotateX(${Math.sin(flip * Math.PI) * 90}deg)` }}>
-            {flip > 0.5 ? '✕ unsupported' : '✓ verified'}
+            {flip > 0.5 ? '✕ from a planted page' : '✓ looks verified'}
           </div>
         </Card>
-        <Card at={run} title="SAME TASK, TWICE" dim={dim}>
+        <Card at={run} title="SAME TASK, TWICE" dim={0}>
           <Row at={run + 8} label="run 1" ok />
           <Row at={diff} label="run 2" ok={false} />
-          <Row at={diff + 10} label="run 3" ok />
-          <div style={{ marginTop: 'auto', fontSize: 26, color: C.muted }}>Which answer is the agent?</div>
+          <div style={{ marginTop: 'auto', fontSize: 26, color: C.muted }}>Two different answers.</div>
         </Card>
-        <Card at={nobody} title="COST PER CORRECT ANSWER" dim={dim}>
-          <div style={{ fontFamily: F.mono, fontSize: 96, fontWeight: 500, color: C.text, marginTop: 30 }}>$0.{scramble}</div>
-          <div style={{ marginTop: 'auto', fontSize: 26, color: C.muted }}>Nobody tells you.</div>
+        <Card at={nobody} title="COST PER CORRECT ANSWER" dim={0}>
+          <div style={{ fontFamily: F.mono, fontSize: 120, fontWeight: 500, color: C.text, marginTop: 30, display: 'flex', alignItems: 'center', gap: 18 }}>
+            $<span style={{ display: 'inline-block', color: C.accent, transform: `scale(${0.6 + q * 0.4}) rotate(${(1 - q) * -20}deg)`, opacity: q }}>?</span>
+          </div>
+          <div style={{ marginTop: 'auto', fontSize: 26, color: C.muted }}>Nobody shows you.</div>
         </Card>
-      </AbsoluteFill>
-      <AbsoluteFill style={{ alignItems: 'center', justifyContent: 'center' }}>
-        <div style={{ fontFamily: F.head, fontWeight: 700, fontSize: 104, letterSpacing: -1, opacity: q, transform: `scale(${0.9 + q * 0.1})`, textAlign: 'center', lineHeight: 1.05 }}>
-          Which agent do<br />you <span style={{ color: C.accent }}>trust?</span>
-        </div>
       </AbsoluteFill>
       <Sfx at={2} name="pop" volume={0.35} />
-      <Sfx at={wrong} name="error" volume={0.4} />
       <Sfx at={run} name="pop" volume={0.35} />
       <Sfx at={diff} name="error" volume={0.3} />
+      <Sfx at={fool} name="error" volume={0.4} />
       <Sfx at={nobody} name="pop" volume={0.35} />
-      <Sfx at={so} name="whoosh" volume={0.4} />
+      <Sfx at={cost} name="pop" volume={0.3} />
     </Bg>
   )
 }

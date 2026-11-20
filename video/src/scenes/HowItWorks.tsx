@@ -1,5 +1,5 @@
 import { AbsoluteFill, Img, interpolate, staticFile, useCurrentFrame } from 'remotion'
-import { CircleCheck, ListChecks, Repeat, SlidersHorizontal, Snowflake, TriangleAlert, type LucideIcon } from 'lucide-react'
+import { Bot, CircleCheck, ListChecks, Plug, Repeat, Snowflake, TriangleAlert, type LucideIcon } from 'lucide-react'
 import { C, F } from '../brand'
 import { Bg, Dashed, Paper, Sfx, clamp, cue, easeOut, useIn } from '../ui/kit'
 
@@ -12,10 +12,10 @@ export function HowItWorks() {
       logo: { src: 'brand/tavily.png', at: cue('how', 'tavily'), label: 'pages built with' } },
     { icon: TriangleAlert, title: 'Plant a trap', sub: 'A fake article, a hidden instruction, or an outage.', at: cue('how', 'plants') },
     { icon: Repeat, title: 'Run it three times', sub: 'One lucky pass does not count.', at: cue('how', 'each') },
-    { icon: ListChecks, title: 'Record every step', sub: 'Searches, pages, model calls and cost.', at: cue('how', 'every', 1),
+    { icon: ListChecks, title: 'Record every step', sub: 'Searches, pages, model calls and cost.', at: cue('how', 'every', 2),
       logo: { src: 'brand/bifrost.png', at: cue('how', 'bifrost'), label: 'every call through' } },
     { icon: CircleCheck, title: 'Check every claim', sub: 'Claims matched to source quotes.', at: cue('how', 'then') },
-    { icon: SlidersHorizontal, title: 'Rank your way', sub: 'Weigh accuracy, cost, traps, honesty.', at: cue('how', 'source', 0, 0.9) },
+    { icon: Plug, title: 'Any agent joins', sub: 'Env vars only. No code changes.', at: cue('how', 'any') },
   ]
   const active = steps.reduce((a, s, i) => (frame >= s.at ? i : a), 0)
   const head = useIn(0)
@@ -26,6 +26,7 @@ export function HowItWorks() {
       <AbsoluteFill style={{ padding: '0 0 0 150px', justifyContent: 'center' }}>
         <div style={{ fontFamily: F.mono, fontSize: 24, letterSpacing: 3, color: C.accent, opacity: head }}>HOW A RUN WORKS</div>
         <div style={{ position: 'relative', height: 420, width: 760, marginTop: 30 }}>
+          <AgentChips from={cue('how', 'every')} until={steps[0].at} />
           {steps.map((s, i) => {
             const enter = interpolate(frame, [s.at, s.at + 14], [0, 1], { ...clamp, easing: easeOut })
             const next = steps[i + 1]?.at ?? 1e7
@@ -51,7 +52,7 @@ export function HowItWorks() {
       {/* Right: the receipt prints one row per step */}
       <AbsoluteFill style={{ alignItems: 'flex-end', justifyContent: 'center', paddingRight: 140 }}>
         <Paper width={720} style={{ transform: `translateY(${(1 - head) * 600}px) rotate(1.2deg)` }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 20, letterSpacing: 3, color: C.muted }}><span>ASSAY · RUN PLAN</span><span>6 STEPS</span></div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 20, letterSpacing: 3, color: C.muted }}><span>ASSAY · TEST PLAN</span><span>6 STEPS</span></div>
           <Dashed />
           {steps.map((s, i) => {
             const p = interpolate(frame, [s.at, s.at + 10], [0, 1], { ...clamp, easing: easeOut })
@@ -83,5 +84,30 @@ export function HowItWorks() {
       {steps.map((s, i) => <Sfx key={i} at={s.at} name="print" volume={0.22} />)}
       {steps.filter(s => s.logo).map((s, i) => <Sfx key={'l' + i} at={s.logo!.at} name="pop" volume={0.45} />)}
     </Bg>
+  )
+}
+
+const AGENTS = ['Baseline', 'Cheap-first', 'Evidence-gated', 'GPT Researcher']
+
+/** "Every agent" beat: the four benchmarked agents line up, then clear for step 1. */
+function AgentChips({ from, until }: { from: number; until: number }) {
+  const frame = useCurrentFrame()
+  const leave = interpolate(frame, [until - 6, until + 6], [0, 1], { ...clamp, easing: easeOut })
+  if (frame < from - 2 || leave === 1) return null
+  return (
+    <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', gap: 22, opacity: 1 - leave, transform: `translateY(${-leave * 50}px)` }}>
+      <div style={{ fontFamily: F.head, fontWeight: 700, fontSize: 72, letterSpacing: -1, lineHeight: 1.05 }}>Same test.<br />Every agent.</div>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 14, width: 720 }}>
+        {AGENTS.map((a, i) => {
+          const p = interpolate(frame, [from + i * 4, from + i * 4 + 12], [0, 1], { ...clamp, easing: easeOut })
+          return (
+            <div key={a} style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 30, padding: '10px 22px', borderRadius: 999, background: C.card, border: `2px solid ${i === 3 ? C.input : C.accentSoft}`,
+              opacity: p, transform: `translateY(${(1 - p) * 24}px)` }}>
+              <Bot size={28} color={i === 3 ? C.muted : C.accent} />{a}
+            </div>
+          )
+        })}
+      </div>
+    </div>
   )
 }

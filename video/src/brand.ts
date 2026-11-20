@@ -18,3 +18,4 @@ export const SCENES = data.scenes as { id: SceneId; text: string; minSeconds: nu
 export const FACTS = data.facts
 export const TEAM: string[] = data.team
 export const REPO = data.repo
+export const TEAM_NAME: string = (data as { teamName?: string }).teamName ?? ""

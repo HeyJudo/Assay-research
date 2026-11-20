@@ -32,7 +32,7 @@
     {
       "id": "outro",
       "text": "Assay. Don't trust the answer. Check the receipt.",
-      "holdSeconds": 3
+      "holdSeconds": 5
     }
   ],
   "facts": {
