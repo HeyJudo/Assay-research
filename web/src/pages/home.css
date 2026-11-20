@@ -6,7 +6,8 @@
 .home-pitch>p { font-size: 19px; line-height: 1.5; color: var(--muted-foreground); max-width: 520px; }
 .home-actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 8px; }
 .home-actions [data-slot="button"] { min-height: 48px; padding-inline: 22px; font-size: 16px; }
-.home-receipt-wrap { display: flex; justify-content: center; min-width: 0; padding: 0 4px; }
+.home-receipt-wrap { min-width: 0; padding: 0 4px; }
+.home-receipt-enter { display: flex; justify-content: center; }
 .home-paper { position: relative; transform: rotate(.8deg); width: 100%; max-width: 420px; filter: drop-shadow(0 24px 40px rgb(74 59 51 / .16)); }
 .home-receipt { display: block; color: var(--foreground); background: #fffefa; padding: 28px 26px 18px; font-size: 13px; line-height: 1.6; }
 .home-receipt:hover { color: var(--foreground); }
@@ -32,7 +33,12 @@
 .home-section-heading>span { color: var(--muted-foreground); font-size: 15px; line-height: 1.5; max-width: 62ch; }
 .home-section-heading>a { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; color: var(--primary); font-size: 15px; font-weight: 600; }
 .home-method { gap: 40px; }
-.home-method>h2 { text-align: center; }
+.home-method h2 { text-align: center; }
+.home-method-track { height: 220vh; }
+.home-method-panel { position: sticky; top: 88px; display: flex; flex-direction: column; gap: 40px; }
+.home-method-caption { min-height: 72px; text-align: center; }
+.home-method-caption p { margin: 0 auto; max-width: 40ch; font-family: var(--font-heading); font-size: 26px; font-weight: 500; line-height: 1.25; letter-spacing: -.01em; }
+.home-flow-fill { position: absolute; inset: 0; background: var(--primary); transform-origin: left; }
 .home-stations-wrap { position: relative; }
 .home-stations { list-style: none; display: grid; grid-template-columns: repeat(6,minmax(0,1fr)); gap: 8px; padding: 0; margin: 0; }
 .home-stations li { position: relative; display: flex; align-items: center; flex-direction: column; text-align: center; gap: 12px; padding: 0 8px; }
@@ -139,14 +145,17 @@
   .home-agent-tab { flex: none; min-height: 48px; }
   .home-agent-panel { padding: 22px 18px; }
 }
-/* Demo video and chapters. */
-.home-demo-video, .home-demo-fallback { display: block; width: 100%; max-width: 960px; aspect-ratio: 16 / 9; border: 1px solid var(--border); border-radius: 8px; background: var(--muted); overflow: hidden; }
+/* Demo video and chapters, centered as one block. */
+.home-demo { align-items: center; text-align: center; }
+.home-demo .home-section-heading { align-items: center; }
+.home-demo-stage { display: flex; flex-direction: column; gap: 24px; width: 100%; max-width: 960px; margin-inline: auto; }
+.home-demo-video, .home-demo-fallback { display: block; width: 100%; aspect-ratio: 16 / 9; border: 1px solid var(--border); border-radius: 8px; background: var(--muted); overflow: hidden; }
 .home-demo-video { object-fit: contain; }
 .home-demo-fallback { position: relative; color: var(--foreground); }
 .home-demo-fallback img { display: block; width: 100%; height: 100%; object-fit: cover; }
 .home-demo-fallback span { position: absolute; left: 50%; bottom: 20px; transform: translateX(-50%); display: inline-flex; align-items: center; gap: 8px; max-width: calc(100% - 32px); padding: 12px 20px; border-radius: 8px; background: var(--primary); color: white; font-weight: 600; font-size: 16px; white-space: nowrap; }
 .home-demo-fallback:hover span { background: var(--primary-hover); }
-.home-chapters { display: flex; gap: 4px; max-width: 960px; padding: 4px; background: var(--muted); border-radius: 8px; overflow-x: auto; scroll-snap-type: x mandatory; }
+.home-chapters { display: flex; gap: 4px; width: 100%; padding: 4px; background: var(--muted); border-radius: 8px; overflow-x: auto; scroll-snap-type: x mandatory; }
 .home-chapter { position: relative; flex: 1 0 auto; display: flex; flex-direction: column; align-items: flex-start; gap: 2px; min-width: 104px; min-height: 52px; padding: 8px 14px; border: 0; border-radius: 6px; background: none; color: var(--muted-foreground); text-align: left; cursor: pointer; scroll-snap-align: start; transition: transform .1s ease-out; }
 .home-chapter:hover, .home-chapter.active { color: var(--foreground); }
 .home-chapter:active { transform: scale(.97); }
