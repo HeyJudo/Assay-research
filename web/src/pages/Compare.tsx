@@ -26,8 +26,9 @@ const metricDefinitions = [
 
 function ReceiptGrid({ records, params }: { records: RunSummary[]; params: URLSearchParams }) {
   const groups = new Map<string, RunSummary[]>()
+  const replay = params.get('scope') === 'batch' && (params.get('batch') ?? '').startsWith('replay_')
   records.forEach(run => {
-    const key = `${run.batch_id}:${run.task_id}:${run.trap ?? 'clean'}`
+    const key = `${replay ? 'replay' : run.batch_id}:${run.task_id}:${run.trap ?? 'clean'}`
     groups.set(key, [...(groups.get(key) ?? []), run])
   })
   return <div className="results-receipt-groups">{[...groups.entries()].map(([group, runs]) => <div key={group} className="results-receipt-group">

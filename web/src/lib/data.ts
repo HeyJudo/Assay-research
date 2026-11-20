@@ -67,7 +67,7 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
 
 function playDemo(id: string, receive: (event: BatchEvent) => void, fail: (message: string) => void): () => void {
     const records = simulatedBatches.get(id) ?? []
-    if (!records.length) { fail('This demo batch is unavailable in this browser. Start a new benchmark.'); return () => {} }
+    if (!records.length) { fail(staticMode ? 'This replay is unavailable in this browser. Start a new replay.' : 'This demo batch is unavailable in this browser. Start a new benchmark.'); return () => {} }
     const events: BatchEvent[] = records.map(r => ({ event: 'run_started', data: { run_id: r.id, batch_id: id, agent_id: r.agent_id, repeat: r.repeat, started_at: r.started_at } }))
     for (let i = 0; i < Math.max(...records.map(r => r.steps.length)); i++) records.forEach(r => { const step = r.steps[i]; if (step) events.push({ event: 'step', data: { run_id: r.id, step } }) })
     records.forEach(r => events.push({ event: 'run_done', data: { run_id: r.id, status: r.status as 'done' | 'error' | 'budget_exceeded', duration_s: r.duration_s!, metrics: r.metrics } }))
