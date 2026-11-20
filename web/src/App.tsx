@@ -38,7 +38,7 @@ function Shell() {
     <a className="skip-link" href="#main-content">Skip to content</a>
     <header className="app-topbar">
       <div className="app-topbar-inner">
-        <Link to="/" className="app-brand" aria-label="Assay home"><img src={`${import.meta.env.BASE_URL}favicon.png`} width={24} height={24} alt="" />Assay</Link>
+        <Link to="/" className="app-brand" aria-label="Assay home"><img src={`${import.meta.env.BASE_URL}assay-wordmark.png`} width={82} height={26} alt="" /></Link>
         <nav aria-label="Main navigation">{nav.map(({ to, label }) => <NavLink key={to} to={to} end aria-current={to === '/run' && pathname === '/results' ? 'page' : undefined} className={({ isActive }) => `app-navlink${isActive || to === '/run' && pathname === '/results' ? ' active' : ''}`}>{label}</NavLink>)}</nav>
         <span className="results-provenance">{sampleData ? 'Sample results' : 'Benchmark results'}</span>
       </div>

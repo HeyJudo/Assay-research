@@ -103,10 +103,9 @@ p { text-wrap: pretty; }
 .app-topbar { position: sticky; top: 0; z-index: 30; background: rgba(253,251,247,.82); backdrop-filter: blur(16px) saturate(160%); -webkit-backdrop-filter: blur(16px) saturate(160%); border-bottom: 1px solid var(--border); box-shadow: inset 0 1px 0 rgba(255,255,255,.6); }
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) { .app-topbar { background: rgb(253,251,247); } }
 @media (prefers-reduced-transparency: reduce) { .app-topbar { background: rgb(253,251,247); backdrop-filter: none; -webkit-backdrop-filter: none; } }
-.app-brand img { width: 24px; height: 24px; flex: none; }
+.app-brand img { width: auto; height: 26px; flex: none; display: block; }
 .app-topbar-inner { max-width: 1200px; padding: 0 24px; min-height: 64px; margin: 0 auto; display: flex; align-items: center; gap: 32px; }
 .app-brand { display: inline-flex; align-items: center; flex: none; gap: 10px; color: var(--foreground); font-family: 'Oxanium', sans-serif; font-size: 18px; font-weight: 600; }
-.app-brand svg { color: var(--primary); }
 .app-brand:hover { color: var(--foreground); }
 .app-topbar nav { display: flex; align-items: center; gap: 4px; flex: 1; }
 .app-navlink { min-height: 44px; padding: 0 14px; display: inline-flex; align-items: center; justify-content: center; border-radius: 6px; font-family: 'Oxanium', sans-serif; font-size: 15px; font-weight: 500; color: var(--muted-foreground); white-space: nowrap; }
