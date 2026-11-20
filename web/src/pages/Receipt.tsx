@@ -127,7 +127,7 @@ export default function Receipt() {
 }
 
 function ScrollBar({ container }: { container: React.RefObject<HTMLElement | null> }) {
-  const { scrollYProgress } = useScroll({ container })
+  const { scrollYProgress } = useScroll({ container, trackContentSize: true })
   return <motion.div className="receipt-progress" aria-hidden="true" style={{ scaleX: scrollYProgress }} />
 }
 
