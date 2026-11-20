@@ -10,8 +10,9 @@ const env = Object.fromEntries(fs.readFileSync(new URL('../.env', root), 'utf8')
   .map(l => l.match(/^([A-Z0-9_]+)=(.*)$/)).filter(Boolean).map(m => [m[1], m[2].trim().replace(/^["']|["']$/g, '')]))
 const KEY = env.ELEVENLABS_API_KEY
 if (!KEY) { console.error('ELEVENLABS_API_KEY missing in .env'); process.exit(1) }
-const VOICE = 'VCgLBmBjldJmfphyB8sZ'
-const VOICE_SETTINGS = { speed: 0.86, stability: 0.5, similarity_boost: 0.75, style: 0.15 }
+const VOICE = 'T2sZgOl8ol4kf4u6yM2z' // David - Real and Laid Back (library voice)
+const MODEL = process.env.TTS_MODEL ?? 'eleven_v4'
+const VOICE_SETTINGS = { speed: 1.0, stability: 0.5, similarity_boost: 0.75, style: 0.1, use_speaker_boost: true }
 const data = JSON.parse(fs.readFileSync(new URL('src/script-data.json', root)))
 const out = p => { const u = new URL('public/' + p, root); fs.mkdirSync(new URL('.', u), { recursive: true }); return u }
 
@@ -25,22 +26,23 @@ const seconds = file => Number(execFileSync('ffprobe', ['-v', 'error', '-show_en
 async function voice() {
   const scenes = data.scenes, durations = {}
   for (const [i, s] of scenes.entries()) {
-    const hash = crypto.createHash('sha1').update(VOICE + JSON.stringify(VOICE_SETTINGS) + s.text).digest('hex')
+    const hash = crypto.createHash('sha1').update(VOICE + MODEL + JSON.stringify(VOICE_SETTINGS) + s.text).digest('hex')
     const jsonFile = out(`audio/${s.id}.json`), mp3 = out(`audio/${s.id}.mp3`)
     const old = fs.existsSync(jsonFile) && JSON.parse(fs.readFileSync(jsonFile))
     if (old?.hash !== hash || !fs.existsSync(mp3)) {
       const r = await call(`/v1/text-to-speech/${VOICE}/with-timestamps?output_format=mp3_44100_128`, {
-        text: s.text, model_id: 'eleven_multilingual_v2', voice_settings: VOICE_SETTINGS,
+        text: s.text, model_id: MODEL, voice_settings: VOICE_SETTINGS,
         previous_text: scenes[i - 1]?.text, next_text: scenes[i + 1]?.text,
       })
       const j = await r.json()
       fs.writeFileSync(mp3, Buffer.from(j.audio_base64, 'base64'))
       const a = j.alignment
+      if (!a?.characters?.length) throw new Error(`no timestamps from ${MODEL}`)
       fs.writeFileSync(jsonFile, JSON.stringify({ hash, chars: a.characters, start: a.character_start_times_seconds, end: a.character_end_times_seconds }))
       console.log('voice', s.id)
     }
     const audioSeconds = seconds(mp3)
-    durations[s.id] = { audioSeconds, frames: Math.ceil(Math.max(audioSeconds + 0.9, s.minSeconds) * 30) }
+    durations[s.id] = { audioSeconds, frames: Math.ceil((0.4 + audioSeconds + 0.6 + (s.holdSeconds ?? 0)) * 30) }
   }
   fs.writeFileSync(new URL('src/durations.json', root), JSON.stringify(durations, null, 2) + '\n')
   // Word timings for animation cues and captions: { scene: [[word, start, end], ...] }
@@ -59,7 +61,7 @@ async function voice() {
   const total = Object.values(durations).reduce((n, d) => n + d.frames, 0)
   for (const [id, d] of Object.entries(durations)) console.log(id.padEnd(9), d.audioSeconds.toFixed(2) + 's audio', (d.frames / 30).toFixed(2) + 's scene')
   console.log('total', (total / 30).toFixed(2) + 's', total, 'frames')
-  if (total < 4350 || total > 4650) { console.error('TOTAL OUT OF RANGE 4350–4650 frames'); process.exit(1) }
+  if (total < 3624 || total > 4734) { console.error("TOTAL OUT OF RANGE: 1:58–2:35 after 84 transition frames"); process.exit(1) }
 }
 
 const SFX = {

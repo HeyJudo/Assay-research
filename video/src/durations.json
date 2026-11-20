@@ -1,34 +1,34 @@
 {
   "hook": {
-    "audioSeconds": 7.894785,
-    "frames": 330
+    "audioSeconds": 11.68,
+    "frames": 381
   },
   "problem": {
-    "audioSeconds": 10.588299,
-    "frames": 390
+    "audioSeconds": 11.12,
+    "frames": 364
   },
   "how": {
-    "audioSeconds": 22.755556,
-    "frames": 720
+    "audioSeconds": 24.08,
+    "frames": 753
   },
   "run": {
-    "audioSeconds": 22.058957,
-    "frames": 720
+    "audioSeconds": 18.08,
+    "frames": 633
   },
   "receipt": {
-    "audioSeconds": 14.675011,
-    "frames": 690
+    "audioSeconds": 11.52,
+    "frames": 376
   },
   "results": {
-    "audioSeconds": 16.904127,
-    "frames": 690
+    "audioSeconds": 16.8,
+    "frames": 534
   },
   "briefing": {
-    "audioSeconds": 16.068209,
-    "frames": 600
+    "audioSeconds": 16.08,
+    "frames": 513
   },
   "outro": {
-    "audioSeconds": 3.482993,
-    "frames": 330
+    "audioSeconds": 3.68,
+    "frames": 231
   }
 }

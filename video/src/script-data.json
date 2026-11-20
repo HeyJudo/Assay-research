@@ -2,43 +2,37 @@
   "scenes": [
     {
       "id": "hook",
-      "minSeconds": 11,
-      "text": "Your research agent just wrote a confident meeting brief. Some of it came from a page planted to fool it. Would you know? This is Assay."
+      "text": "We built an AI agent that writes meeting briefs. Then we made two smarter versions. Are they actually better? Every brief sounds confident, even when it's wrong. This is Assay."
     },
     {
       "id": "problem",
-      "minSeconds": 13,
-      "text": "Research agents sound sure, even when they're wrong. Run one twice, and you get two different answers. And nobody tells you what a correct answer actually cost. So which agent do you trust?"
+      "text": "You can't tell by reading. Run the same agent twice, and you get two different answers. One planted page can fool it. And nobody shows what a correct answer actually cost."
     },
     {
       "id": "how",
-      "minSeconds": 24,
-      "text": "Assay freezes the web, so every agent searches the same saved pages, built once with Tavily. It plants a trap: a fake article, a hidden instruction, or an outage. Each agent runs three times. Every model call goes through Bifrost on a budget-capped key, so every step and every cent is recorded. Then each claim is checked against its source."
+      "text": "Assay tests every agent the same way. It freezes the web with Tavily, so every agent reads the same saved pages. It plants a trap. It runs each agent three times. Every model call goes through Bifrost, so every step and every cent is recorded. Then each claim is checked against its source. And any agent can join, with no code changes."
     },
     {
       "id": "run",
-      "minSeconds": 24,
-      "text": "Pick your agents, a task, and a trap. Here, our three agent versions brief on Maxim AI, with a hidden instruction planted in one of the pages. Each one runs three times. As each run finishes, its searches, page reads, and model calls appear, with costs read straight from Bifrost's logs. All nine runs fell for the trap."
+      "text": "Let's test our three versions. Pick the agents, a meeting-brief task, and a trap: a hidden instruction planted in one page. Each agent runs three times, and every search, page read and model call appears live. A few minutes later: all nine runs fell for the trap.",
+      "holdSeconds": 2
     },
     {
       "id": "receipt",
-      "minSeconds": 23,
-      "text": "Every run leaves a receipt: what it did, which models it paid, and what it cost. This Cheap-first run switched models at thirty-two seconds, spent half a cent, and fell for the trap. Here's the claim, and here's the planted page it came from."
+      "text": "Why? Open a receipt. This Cheap-first run switched models at thirty-two seconds, and spent half a cent. Here's the false claim, and here's the planted page it came from."
     },
     {
       "id": "results",
-      "minSeconds": 23,
-      "text": "Here's what surprised us. We built two smarter versions of our agent. Cheap-first costs sixteen percent more per correct answer. Evidence-gated scored lower. Baseline wins. Weigh accuracy over cost, and the outside agent, GPT Researcher, takes the top spot."
+      "text": "Now the ranking. Cheap-first costs sixteen percent more per correct answer. Evidence-gated scored lower. Our original, Baseline, has the best cost per correct answer. Weigh accuracy most, and the outside agent, GPT Researcher, comes first."
     },
     {
       "id": "briefing",
-      "minSeconds": 20,
-      "text": "Then put it to work. Enter a company and a meeting time. The Briefing Agent searches the last thirty days live with Tavily, and gives you a one-page brief: verified facts with sources, what's uncertain, what it couldn't find, and open questions to ask."
+      "text": "So we ship Baseline. Enter a company and a meeting time. The Briefing Agent searches the last thirty days live with Tavily, and writes a one-page brief: verified facts with sources, what's uncertain, what it couldn't find, and questions to ask."
     },
     {
       "id": "outro",
-      "minSeconds": 11,
-      "text": "That's Assay. Don't trust the answer. Check the receipt."
+      "text": "Assay. Don't trust the answer. Check the receipt.",
+      "holdSeconds": 3
     }
   ],
   "facts": {
@@ -61,6 +55,11 @@
       "trapResistance": 0.5
     }
   },
-  "team": [],
-  "repo": "github.com/HeyJudo/Assay-research"
+  "team": [
+    "Jude Sangalang",
+    "Harvey Buenaventura",
+    "Krystelle Eledia"
+  ],
+  "repo": "github.com/HeyJudo/Assay-research",
+  "teamName": "Legendary Birds"
 }
