@@ -31,7 +31,7 @@ function ReceiptRedirect() {
 function Shell() {
   const { pathname } = useLocation()
   useEffect(() => {
-    document.title = `Assay · ${pathname === '/results' ? 'Results' : nav.find(item => item.to === pathname)?.label ?? 'Run receipt'}`
+    document.title = `Assay · ${pathname === '/results' ? 'Results' : nav.find(item => item.to === pathname)?.label ?? (pathname.startsWith('/runs/') ? 'Run receipt' : 'Page not found')}`
   }, [pathname])
 
   return <div className="app-shell">
