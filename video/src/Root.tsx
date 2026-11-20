@@ -1,5 +1,7 @@
 import React from 'react'
-import { AbsoluteFill, Audio, Composition, Sequence, Series, interpolate, staticFile } from 'remotion'
+import { AbsoluteFill, Audio, Composition, Sequence, interpolate, staticFile } from 'remotion'
+import { TransitionSeries, linearTiming } from '@remotion/transitions'
+import { fade } from '@remotion/transitions/fade'
 import { FPS, SCENES, TEAM, type SceneId } from './brand'
 import durations from './durations.json'
 import { Hook } from './scenes/Hook'
@@ -16,9 +18,11 @@ const SCENE: Record<SceneId, React.FC> = {
   hook: Hook, problem: Problem, how: HowItWorks, run: RunScene, receipt: ReceiptScene, results: ResultsScene, briefing: BriefingScene, outro: Outro,
 }
 
+/** Frames each scene overlaps the next (crossfade). */
+export const TRANSITION = 12
 const starts: Record<string, number> = {}
-SCENES.reduce((at, s) => { starts[s.id] = at; return at + D[s.id].frames }, 0)
-export const TOTAL = SCENES.reduce((n, s) => n + D[s.id].frames, 0)
+SCENES.reduce((at, s) => { starts[s.id] = at; return at + D[s.id].frames - TRANSITION }, 0)
+export const TOTAL = SCENES.reduce((n, s) => n + D[s.id].frames, 0) - TRANSITION * (SCENES.length - 1)
 
 // Global frame ranges where narration is speaking, for music ducking.
 const speech = SCENES.map(s => {
@@ -37,18 +41,19 @@ function Demo() {
   if (process.env.REMOTION_FINAL === '1' && !TEAM.length) throw new Error('Final render blocked: fill "team" in src/script-data.json')
   return (
     <AbsoluteFill>
-      <Series>
-        {SCENES.map(s => {
+      <TransitionSeries>
+        {SCENES.flatMap((s, i) => {
           const Scene = SCENE[s.id]
-          return (
-            <Series.Sequence key={s.id} durationInFrames={D[s.id].frames} name={s.id}>
+          const seq = (
+            <TransitionSeries.Sequence key={s.id} durationInFrames={D[s.id].frames} name={s.id}>
               <Scene />
               <Sequence from={Math.round(LEAD * FPS)} layout="none"><Audio src={staticFile(`audio/${s.id}.mp3`)} /></Sequence>
               <Captions scene={s.id} />
-            </Series.Sequence>
+            </TransitionSeries.Sequence>
           )
+          return i === 0 ? [seq] : [<TransitionSeries.Transition key={s.id + '-t'} presentation={fade()} timing={linearTiming({ durationInFrames: TRANSITION })} />, seq]
         })}
-      </Series>
+      </TransitionSeries>
       <Audio src={staticFile('music.mp3')} volume={musicVolume} />
     </AbsoluteFill>
   )
