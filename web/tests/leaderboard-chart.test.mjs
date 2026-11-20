@@ -20,3 +20,16 @@ test('missing or inconsistent bounds do not manufacture spread bars', () => {
   assert.equal(chartPoint({ ...row, accuracy_low: null }).spread, undefined)
   assert.equal(chartPoint({ ...row, accuracy_low: .8 }).spread, undefined)
 })
+import { costAxis, accuracyTop } from '../src/lib/leaderboard-chart.ts'
+test('cost axis is log for positive costs and linear when a cost is zero', () => {
+  const log = costAxis([.005, .006, .025])
+  assert.equal(log.scale, 'log')
+  assert.ok(log.domain[0] < .005 && log.domain[1] > .025)
+  assert.deepEqual(log.ticks, [.005, .01, .02])
+  assert.equal(costAxis([0, .01]).scale, 'linear')
+  assert.equal(costAxis([]).scale, 'linear')
+})
+test('accuracy axis top leaves headroom and caps at 100', () => {
+  assert.equal(accuracyTop([17, 50]), 60)
+  assert.equal(accuracyTop([95]), 100)
+})

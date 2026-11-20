@@ -1,5 +1,5 @@
 import { Fragment } from 'react'
-import { Link, useSearchParams } from 'react-router'
+import { Link, useLocation, useSearchParams } from 'react-router'
 import { motion, useReducedMotion } from 'motion/react'
 import { Circle, List, Plus, ReceiptText, Trophy, X, Check } from 'lucide-react'
 import { Coins, Flag, Shield, Target } from 'kubai-icons-react'
@@ -50,6 +50,7 @@ function ReceiptGrid({ records, params }: { records: RunSummary[]; params: URLSe
 
 export default function Results() {
   const [params, setParams] = useSearchParams()
+  const { search } = useLocation()
   const reduced = useReducedMotion()
   const batch = params.get('batch') ?? ''
   const scope = params.get('scope') === 'batch' && batch ? 'batch' : 'full'
@@ -62,7 +63,11 @@ export default function Results() {
   const a = scope === 'batch' ? aggregate(records, aId) : rows.find(row => row.agent_id === aId)
   const b = scope === 'batch' ? aggregate(records, bId) : rows.find(row => row.agent_id === bId)
   const verdict = resultVerdict(a, b, agentLabel(aId), agentLabel(bId))
-  const reveal = { initial: reduced ? false as const : { opacity: 0, y: 14 }, whileInView: { opacity: 1, y: 0 }, viewport: { once: true, amount: .15 }, transition: spring }
+  const noWinner = verdict.value == null
+  const trapA = a?.trap_resistance, trapB = b?.trap_resistance
+  const allFell = hasNumber(trapA) && hasNumber(trapB) && trapA <= 0 && trapB <= 0
+  const noWinnerReason = !a && !b ? verdict.description : allFell ? 'Every run fell for the planted trap, so there is no clean accuracy to compare.' : 'This task has no clean, answerable outcome to compare.'
+  const reveal = { initial: reduced ? false as const : { opacity: 0, y: 14 }, whileInView: { opacity: 1, y: 0 }, viewport: { once: true, amount: .1, margin: '0px 0px 15% 0px' }, transition: spring }
   const selected = [a, b].filter((row): row is LeaderboardRow => !!row)
   function update(key: string, value: string) {
     setParams(previous => {
@@ -74,10 +79,13 @@ export default function Results() {
   }
   return <div className="results-page">
     <div className="results-topline"><BenchmarkRail stage={5} /><Button variant="outline" asChild><Link to="/run?new=1"><Plus size={16} />New benchmark</Link></Button></div>
-    <motion.section className="results-hero" {...reveal} aria-labelledby="results-title">
+    {noWinner ? <motion.section className="results-hero results-hero-neutral" {...reveal} aria-labelledby="results-title">
+      <div className="results-hero-main"><div><h1 id="results-title">{verdict.title}</h1><p>{noWinnerReason}</p></div></div>
+      {(hasNumber(trapA) || hasNumber(trapB)) && <div className="results-trap-pair" aria-label="Trap resistance"><span className="results-trap-label">Trap resistance</span>{[[aId, trapA], [bId, trapB]].filter(([id, value]) => id && hasNumber(value as number | null | undefined)).map(([id, value], index) => <div key={String(id)}><span className={`results-swatch ${index ? 'agent-b' : 'agent-a'}`} aria-hidden="true" /><span title={agentLabel(String(id))}>{agentLabel(String(id))}</span><strong className="mono">{percent(value as number)}</strong></div>)}</div>}
+    </motion.section> : <motion.section className="results-hero" {...reveal} aria-labelledby="results-title">
       <div className="results-hero-main"><span className="results-trophy"><Trophy size={36} /></span><div><h1 id="results-title">{verdict.title}</h1><p>{verdict.description}</p></div></div>
       <div className="results-headline-number"><div className="mono"><CountUp value={verdict.value} format={value => `${Math.round(value)}${verdict.label.includes('percentage points') ? '' : '%'}`} /></div><span>{verdict.label}</span></div>
-    </motion.section>
+    </motion.section>}
     {(sampleData || batch.startsWith('demo_') || (batch.startsWith('replay_') && scope === 'batch')) && <p className="results-data-note">{batch.startsWith('replay_') && scope === 'batch' ? 'Replay of recorded benchmark runs.' : scope === 'batch' ? 'Demo simulation. These outcomes demonstrate the interface and are not benchmark findings.' : 'Sample results. Illustrative aggregates are shown with their available example receipts.'}</p>}
     <div className="results-controls">
       <div className="results-agent-pickers"><span className="results-swatch agent-a" aria-hidden="true" /><Select value={aId || 'unavailable'} onValueChange={value => update('a', value)} disabled={!ids.length}><SelectTrigger aria-label="First agent"><SelectValue placeholder="First agent" /></SelectTrigger><SelectContent>{ids.map(id => <SelectItem value={id} key={id}>{agentLabel(id)}</SelectItem>)}</SelectContent></Select><span className="results-against">against</span><span className="results-swatch agent-b" aria-hidden="true" /><Select value={bId || 'unavailable'} onValueChange={value => update('b', value)} disabled={ids.length < 2}><SelectTrigger aria-label="Second agent">{ids.length < 2 ? <span>One agent</span> : <SelectValue placeholder="Second agent" />}</SelectTrigger><SelectContent>{ids.map(id => <SelectItem value={id} key={id}>{agentLabel(id)}</SelectItem>)}</SelectContent></Select></div>
@@ -94,7 +102,7 @@ export default function Results() {
       return <motion.section key={key} className={`results-tile ${cost && comparison.includes('cheaper') ? 'results-cost-highlight' : ''}`} {...reveal}>
         <div className="results-tile-title"><span className="results-icon"><Icon size={23} color="var(--primary)" trigger="none" /></span><h2>{label}</h2></div>
         <span className={`results-chip ${comparison === 'Tie' || comparison === 'Not comparable' ? 'equal' : 'better'}`}>{better ? `${agentLabel(better)}: ` : ''}{comparison}</span>
-        <div className="results-bar-rows">{[[aId, av, 'a'], [bId, bv, 'b']].filter(([id]) => id).map(([id, value, side]) => <a href="#results-receipts" className="results-bar-row" key={String(side)} aria-label={`${agentLabel(String(id))}: ${label} ${format(value as number | null | undefined)}. See receipts.`}><span title={agentLabel(String(id))}>{agentLabel(String(id))}</span><span className="results-bar-track"><motion.i className={`agent-${side}`} initial={reduced ? false : { scaleX: 0 }} whileInView={{ scaleX: hasNumber(value as number | null | undefined) ? cost ? costMax ? Math.max(0, Number(value) / costMax) : 0 : Math.max(0, Math.min(1, Number(value))) : 0 }} viewport={{ once: true }} transition={spring} /></span><strong className="mono"><CountUp value={value as number | null | undefined} format={format} /></strong></a>)}</div>
+        <div className="results-bar-rows">{[[aId, av, 'a'], [bId, bv, 'b']].filter(([id]) => id).map(([id, value, side]) => <Link to={{ search, hash: 'results-receipts' }} className="results-bar-row" key={String(side)} aria-label={`${agentLabel(String(id))}: ${label} ${format(value as number | null | undefined)}. See receipts.`}><span title={agentLabel(String(id))}>{agentLabel(String(id))}</span><span className="results-bar-track"><motion.i className={`agent-${side}`} initial={reduced ? false : { scaleX: 0 }} whileInView={{ scaleX: hasNumber(value as number | null | undefined) ? cost ? costMax ? Math.max(0, Number(value) / costMax) : 0 : Math.max(0, Math.min(1, Number(value))) : 0 }} viewport={{ once: true, margin: '0px 0px 15% 0px' }} transition={spring} /></span><strong className="mono"><CountUp value={value as number | null | undefined} format={format} /></strong></Link>)}</div>
         <p>{ranges ? `Observed ranges: ${percent(a!.accuracy_low)} to ${percent(a!.accuracy_high)} and ${percent(b!.accuracy_low)} to ${percent(b!.accuracy_high)}.` : note}{!hasNumber(av) || (bId && !hasNumber(bv)) ? ' N/A means this scope has no eligible denominator.' : ''}</p>
       </motion.section>
     })}</div>
@@ -102,7 +110,7 @@ export default function Results() {
       <motion.section className="results-tile results-receipts" id="results-receipts" {...reveal}><div className="results-tile-title"><span className="results-icon"><ReceiptText size={20} /></span><div><h2>Receipts</h2><p>Open any run to see its steps, cost and proof.</p></div></div>{records.length ? <ReceiptGrid records={records} params={params} /> : <p>No run receipts are available in this scope.</p>}</motion.section>
       <motion.section className="results-tile results-more" {...reveal}><div className="results-tile-title"><span className="results-icon"><List size={20} /></span><h2>More numbers</h2></div><table><thead><tr><th scope="col">Metric</th>{selected.map(row => <th scope="col" key={row.agent_id}>{agentLabel(row.agent_id)}</th>)}</tr></thead><tbody>{([
         ['Passed all 3 repeats', 'pass3', 'percent', true], ['Average steps', 'avg_steps', 'number', false], ['Average tokens', 'avg_tokens', 'tokens', false], ['Average time', 'avg_duration_s', 'duration', false], ['Recorded runs', 'runs', 'tokens', false],
-      ] as const).map(([label, key, kind, higher]) => <tr key={key}><th scope="row"><a href="#results-receipts">{label}</a></th>{selected.map(row => {
+      ] as const).map(([label, key, kind, higher]) => <tr key={key}><th scope="row">{label}</th>{selected.map(row => {
         const value = row[key], other = selected.find(item => item.agent_id !== row.agent_id)?.[key]
         const best = hasNumber(value) && hasNumber(other) && (higher ? value > other : value < other)
         return <td key={row.agent_id} className={`mono ${best && key !== 'runs' ? 'best' : ''}`}>{kind === 'percent' ? percent(value) : !hasNumber(value) ? 'N/A' : kind === 'tokens' ? value.toLocaleString(undefined, { maximumFractionDigits: 0 }) : `${value.toFixed(1)}${kind === 'duration' ? ' s' : ''}`}</td>

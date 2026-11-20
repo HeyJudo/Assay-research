@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "build:static": "tsc -b && vite build --mode static --base ./",
+    "build:static": "tsc -b && vite build --mode static --base ./ && node -e \"require('fs').cpSync('../video/out/assay-demo.mp4','dist/demo/assay-demo.mp4')\"",
     "lint": "oxlint",
     "preview": "vite preview",
     "test": "node --test tests/*.test.mjs"
