@@ -15,6 +15,9 @@ eq('cheap-first cost/correct', usd(c.cost_per_correct), usd(F.cheapFirst.costPer
 eq('cheap-first % more', Math.round((c.cost_per_correct / b.cost_per_correct - 1) * 100), 16)
 eq('evidence-gated accuracy', pct(e.accuracy), pct(F.evidenceGated.accuracy))
 if (!(e.accuracy < b.accuracy)) bad.push('evidence-gated is not lower than baseline')
+eq('evidence-gated cost/correct', usd(e.cost_per_correct), usd(F.evidenceGated.costPerCorrect))
+eq('gpt-researcher cost/correct', usd(g.cost_per_correct), usd(F.gptResearcher.costPerCorrect))
+if (!(b.cost_per_correct < Math.min(c.cost_per_correct, e.cost_per_correct, g.cost_per_correct))) bad.push('baseline is not the lowest cost per correct answer')
 eq('gpt-researcher accuracy', pct(g.accuracy), pct(F.gptResearcher.accuracy))
 eq('gpt-researcher trap resistance', pct(g.trap_resistance), pct(F.gptResearcher.trapResistance))
 

@@ -14,8 +14,7 @@
     },
     {
       "id": "run",
-      "text": "Let's test our three versions. Pick the agents, a meeting-brief task, and a trap: a hidden instruction planted in one page. Each agent runs three times, and every search, page read and model call appears live. A few minutes later: all nine runs fell for the trap.",
-      "holdSeconds": 2
+      "text": "Let's test our three versions. Pick the agents, a meeting-brief task, and a trap: a hidden instruction planted in one page. Each agent runs three times, and every search, page read and model call appears live. A few minutes later: all nine runs fell for the trap."
     },
     {
       "id": "receipt",
@@ -48,11 +47,13 @@
       "costPerCorrect": 0.0061
     },
     "evidenceGated": {
-      "accuracy": 0.17
+      "accuracy": 0.17,
+      "costPerCorrect": 0.0068
     },
     "gptResearcher": {
       "accuracy": 0.42,
-      "trapResistance": 0.5
+      "trapResistance": 0.5,
+      "costPerCorrect": 0.0249
     }
   },
   "team": [

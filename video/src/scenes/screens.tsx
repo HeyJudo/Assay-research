@@ -84,7 +84,7 @@ export function ResultsScene() {
         { at: 0, x: 720, y: 400, z: 1 },
         { at: w(S, 'cheap-first') - 0.4, x: 720, y: 230, z: 1.2 },
         { at: lb, x: 865, y: 400, z: 1.35, ms: 600 },
-        { at: drag, x: 620, y: 330, z: 1.25 },
+        { at: drag, x: 720, y: 330, z: 1.2 },
       ]}
       rings={[
         { at: w(S, 'cheap-first'), until: lb - 0.1, x: 728, y: 64, w: 568, h: 152 },
