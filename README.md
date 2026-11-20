@@ -194,8 +194,8 @@ The agents under test use Gemini 3.5 Flash-Lite and Gemini 3.1 Flash-Lite via Go
 | Member | Role | Work |
 |---|---|---|
 | Jude | Lead | Search proxy, pools, traps, runner, API, Bifrost and deploy |
-|  | Backend | Briefing Agent and graders |
-|  | Frontend | Dashboard screens |
+| Krystelle | Backend | Briefing Agent and graders |
+| Harvey  | Frontend | Dashboard screens |
 
 ## License
 
