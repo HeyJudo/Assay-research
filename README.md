@@ -6,7 +6,7 @@
 
 Assay tests research agents on the same frozen web pages, repeats each task, and injects controlled failures. A separate model checks claims in completed benchmark briefings against their cited passages. Run receipts show what the agents did, and a leaderboard helps teams choose based on accuracy, cost, resistance to traps, and whether agents admit when evidence is missing.
 
-[Global AI Hackathon 2026](https://hackculture.io/hackathons/ai-global-hackathon) · [Live demo](https://heyjudo-assay.static.hf.space) · [Demo video](<VIDEO_URL>)
+[Global AI Hackathon 2026](https://hackculture.io/hackathons/ai-global-hackathon) · [Live demo](https://heyjudo-assay.static.hf.space) · [Demo video](https://drive.google.com/file/d/17u86gcrxQa9aCrrcDeHq_-4jH2z0gFrF/view)
 
 | Track | Problem statement | Entry |
 |---|---|---|

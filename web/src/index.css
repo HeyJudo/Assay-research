@@ -81,7 +81,9 @@
 }
 
 * { box-sizing: border-box; }
+:root { color-scheme: light; }  /* light only: native controls never flip dark */
 body { margin: 0; font-size: 15px; line-height: 1.5; -webkit-font-smoothing: antialiased; }
+::selection { background: var(--accent); color: var(--accent-foreground); }
 button, input, select, textarea { font: inherit; color: inherit; }
 button, a, input, select { -webkit-tap-highlight-color: transparent; }
 button { cursor: pointer; }
@@ -94,9 +96,14 @@ h1, h2, h3, button, [data-slot="button"] { font-family: 'Oxanium', 'Geist Variab
 h1 { font-size: clamp(32px, 3.6vw, 44px); font-weight: 600; line-height: 1.08; letter-spacing: -.03em; }
 h2 { font-size: 24px; line-height: 1.25; font-weight: 600; letter-spacing: -.02em; }
 h3 { font-size: 18px; line-height: 1.35; font-weight: 600; }
+h1, h2, h3 { text-wrap: balance; }
+p { text-wrap: pretty; }
 .mono, .metric-number { font-family: 'Fira Code', ui-monospace, monospace; font-variant-numeric: tabular-nums; }
 .app-shell { min-height: 100vh; }
-.app-topbar { position: sticky; top: 0; z-index: 30; background: rgba(253,251,247,.82); backdrop-filter: blur(16px) saturate(160%); border-bottom: 1px solid var(--border); }
+.app-topbar { position: sticky; top: 0; z-index: 30; background: rgba(253,251,247,.82); backdrop-filter: blur(16px) saturate(160%); -webkit-backdrop-filter: blur(16px) saturate(160%); border-bottom: 1px solid var(--border); box-shadow: inset 0 1px 0 rgba(255,255,255,.6); }
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) { .app-topbar { background: rgb(253,251,247); } }
+@media (prefers-reduced-transparency: reduce) { .app-topbar { background: rgb(253,251,247); backdrop-filter: none; -webkit-backdrop-filter: none; } }
+.app-brand img { width: 24px; height: 24px; flex: none; }
 .app-topbar-inner { max-width: 1200px; padding: 0 24px; min-height: 64px; margin: 0 auto; display: flex; align-items: center; gap: 32px; }
 .app-brand { display: inline-flex; align-items: center; flex: none; gap: 10px; color: var(--foreground); font-family: 'Oxanium', sans-serif; font-size: 18px; font-weight: 600; }
 .app-brand svg { color: var(--primary); }
@@ -117,7 +124,10 @@ h3 { font-size: 18px; line-height: 1.35; font-weight: 600; }
 .load-state { min-height: 300px; padding: 40px 16px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; color: var(--muted-foreground); text-align: center; }
 .skip-link { position: fixed; z-index: 100; left: 16px; top: 8px; transform: translateY(-150%); background: var(--card); padding: 10px 18px; border-radius: 6px; }
 .skip-link:focus { transform: translateY(0); }
-[data-slot="button"] { min-height: 44px; height: auto; gap: 8px; padding: 10px 18px; border-radius: 6px; font-size: 15px; font-weight: 600; transition-property: transform, opacity; }
+[data-slot="button"] { min-height: 44px; height: auto; gap: 8px; padding: 10px 18px; border-radius: 6px; font-size: 15px; font-weight: 600; transition-property: transform, opacity; transition-duration: 160ms; transition-timing-function: cubic-bezier(.2,.8,.2,1); }
+/* Press feedback on pointer-down, released with the same curve. */
+[data-slot="button"]:active:not(:disabled), .app-navlink:active { transform: scale(.97); transition-duration: 80ms; }
+.app-navlink { transition: transform 160ms cubic-bezier(.2,.8,.2,1); }
 [data-slot="button"][data-variant="default"] { color: var(--primary-foreground); }
 [data-slot="button"][data-variant="default"]:hover { background: var(--primary-hover); color: white; }
 [data-slot="button"][data-variant="outline"] { background: white; border-color: var(--input); color: var(--foreground); }
