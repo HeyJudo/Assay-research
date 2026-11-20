@@ -10,6 +10,7 @@ import { LoadState } from '@/components/shared'
 import { apiMode, data } from '@/lib/data'
 import { useData } from '@/lib/use-data'
 import { agentLabel, money } from '@/lib/metrics'
+import { savedPasscode } from '@/lib/passcode'
 import { latestBatchId, loadDraft, loadSession, recoverCells, resetDraft, saveDraft, saveSession } from '@/lib/run-session'
 import type { RunCell, RunSession, SetupDraft } from '@/lib/run-session'
 import type { BatchEvent, Step, Trap } from '@/types'
@@ -60,7 +61,7 @@ export default function Run() {
   const requestedBatch = params.get('batch') ?? ''
   const batch = requestedBatch || (newRequested ? '' : latestBatchId(mode))
   const [draft, setDraft] = useState<SetupDraft>(() => newRequested ? { ...defaults } : loadDraft(mode) ?? { ...defaults })
-  const [passcode, setPasscode] = useState('')
+  const [passcode, setPasscode] = useState(savedPasscode)
   const [session, setSession] = useState<RunSession | null>(() => batch ? loadSession(mode, batch) : null)
   const [starting, setStarting] = useState(false)
   const [error, setError] = useState('')
@@ -78,7 +79,7 @@ export default function Run() {
     unsubscribe.current()
     resetDraft(mode)
     // oxlint-disable-next-line react/set-state-in-effect -- Synchronize the explicit New benchmark URL action.
-    setSession(null); setDraft({ ...defaults }); setPasscode(''); setError('')
+    setSession(null); setDraft({ ...defaults }); setPasscode(savedPasscode()); setError('')
     setParams(previous => { const next = new URLSearchParams(previous); next.delete('new'); next.delete('batch'); return next }, { replace: true })
   }, [newRequested, setParams])
 
@@ -181,7 +182,7 @@ export default function Run() {
       const next: RunSession = { batch: result.batch_id, agents: selected, task: actualTask.id, trap: actualTrap.id, startedAt: Date.now(), stage: 'running', cells: {}, activeCell: '' }
       saveSession(mode, next)
       if (!mounted.current) return
-      setSession(next); setPasscode('')
+      setSession(next); setPasscode(savedPasscode())
       setParams({ batch: result.batch_id }, { replace: true })
     } catch (reason) { if (mounted.current) setError(reason instanceof Error ? reason.message : 'Unable to start the batch.') }
     finally { if (mounted.current) setStarting(false) }

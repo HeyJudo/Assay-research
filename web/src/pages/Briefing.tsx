@@ -9,6 +9,7 @@ import { BriefText, LoadState, safeUrl } from '@/components/shared'
 import { apiMode, data, sampleData } from '@/lib/data'
 import { useData } from '@/lib/use-data'
 import { agentLabel, defaultWeights, money, percent, rankRows } from '@/lib/metrics'
+import { savedPasscode } from '@/lib/passcode'
 import { splitBriefing } from '@/lib/briefing-output'
 import type { RunRecord } from '@/types'
 import './briefing.css'
@@ -31,6 +32,7 @@ export default function Briefing() {
     return `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, '0')}-${String(next.getDate()).padStart(2, '0')}T09:00`
   })
   const [version, setVersion] = useState('')
+  const [passcode, setPasscode] = useState(savedPasscode)
   const [submittedSubject, setSubmittedSubject] = useState('')
   const [submittedMeeting, setSubmittedMeeting] = useState('')
   const [run, setRun] = useState<RunRecord | null>(null)
@@ -52,10 +54,11 @@ export default function Briefing() {
     e.preventDefault(); setError('')
     if (!subject.trim() || !meeting) { setError('Enter a company or person and a meeting date/time.'); return }
     if (!Number.isFinite(new Date(meeting).getTime())) { setError('Enter a valid meeting time.'); return }
+    if (apiMode && !passcode.trim()) { setError('Enter the team passcode for a live briefing.'); return }
     setBusy(true); setRun(null); setPendingRun(''); setSubmittedSubject(subject.trim()); setSubmittedMeeting(meeting)
     const session = ++controller.current
     try {
-      const result = await data.brief(subject.trim(), new Date(meeting).toISOString(), selected)
+      const result = await data.brief(subject.trim(), new Date(meeting).toISOString(), selected, passcode)
       if (session !== controller.current) return
       setPendingRun(result.run_id)
       for (let attempt = 0; attempt < 120; attempt++) {
@@ -79,6 +82,7 @@ export default function Briefing() {
       <label htmlFor="brief-who">Company or person<Input id="brief-who" placeholder="e.g. Tavily" value={subject} onChange={e => setSubject(e.target.value)} maxLength={150} disabled={busy} required /></label>
       <label htmlFor="brief-when">Meeting time<Input id="brief-when" type="datetime-local" value={meeting} onChange={e => setMeeting(e.target.value)} disabled={busy} required /><small>Your time zone: {Intl.DateTimeFormat().resolvedOptions().timeZone}.</small></label>
       <div className="briefing-version"><label htmlFor="brief-version">Agent version</label><Select value={selected} onValueChange={setVersion} disabled={busy}><SelectTrigger id="brief-version" aria-label="Agent version"><SelectValue /></SelectTrigger><SelectContent>{agents.filter(agent => agent.kind === 'ours').map(agent => <SelectItem key={agent.id} value={agent.id}>{agentLabel(agent.id)}{agent.id === best?.agent_id ? ' (top pick)' : ''}</SelectItem>)}</SelectContent></Select><p>{selectedRow ? <>{agentLabel(selected)} has <span className="mono">{percent(selectedRow.accuracy)}</span> accuracy and <span className="mono">{percent(selectedRow.trap_resistance)}</span> trap resistance in the {sampleData ? 'sample' : 'full'} benchmark. </> : 'No benchmark score is available for this version. '}<Link to="/leaderboard">See why</Link></p></div>
+      {apiMode && <label className="run-passcode">Team passcode<Input type="password" autoComplete="off" value={passcode} onChange={e => setPasscode(e.target.value)} disabled={busy} /><small>Live briefings spend real model budget, so they need the passcode.</small></label>}
       {error && <p className="error-message" role="alert">{error}</p>}
       <Button type="submit" disabled={busy}>{busy ? <LoaderCircle size={18} className="spin" /> : null}{busy ? 'Writing the brief…' : 'Write the brief'}{!busy && <ArrowRight size={18} />}</Button>
       <p className="briefing-mode-note">{apiMode ? 'Researches the 30 days before your meeting with Tavily.' : 'Sample output only. No live searches, model calls or provider spending.'}</p>

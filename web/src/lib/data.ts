@@ -113,8 +113,8 @@ export const data = {
     }, 160)
     return () => window.clearInterval(timer)
   },
-  brief: async (subject: string, meeting_time: string, version: string): Promise<{ run_id: string }> => {
-    if (apiMode) return request('/brief', { method: 'POST', body: JSON.stringify({ subject, meeting_time, version }) })
+  brief: async (subject: string, meeting_time: string, version: string, passcode: string): Promise<{ run_id: string }> => {
+    if (apiMode) return request('/brief', { method: 'POST', body: JSON.stringify({ subject, meeting_time, version, passcode }) })
     await new Promise(resolve => setTimeout(resolve, 800))
     const record = structuredClone(runs[0])
     record.id = `demo_brief_${Date.now()}`
