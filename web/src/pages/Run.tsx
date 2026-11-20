@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { BenchmarkRail } from '@/components/benchmark-rail'
 import { LoadState } from '@/components/shared'
-import { apiMode, data } from '@/lib/data'
+import { apiMode, data, staticMode } from '@/lib/data'
 import { useData } from '@/lib/use-data'
 import { agentLabel, money } from '@/lib/metrics'
 import { savedPasscode } from '@/lib/passcode'
@@ -16,7 +16,7 @@ import type { RunCell, RunSession, SetupDraft } from '@/lib/run-session'
 import type { BatchEvent, Step, Trap } from '@/types'
 import './run.css'
 
-const mode = apiMode ? 'api' : 'demo'
+const mode = apiMode ? 'api' : staticMode ? 'static' : 'demo'
 const defaults: SetupDraft = { selected: ['briefing-baseline', 'briefing-cheap-first'], task: 'brief-tavily', trap: '', step: 1 }
 const traps = [
   { id: '', label: 'No trap', help: 'A clean run on the frozen pages.' },
@@ -70,6 +70,8 @@ export default function Run() {
   const unsubscribe = useRef<() => void>(() => {})
   const mounted = useRef(true)
   const query = useData(() => Promise.all([data.agents(), data.tasks()]))
+  const trapTask = query.value ? (query.value[1].find(task => task.id === draft.task) ?? query.value[1][0])?.id ?? '' : ''
+  const recorded = useData(() => staticMode && trapTask ? data.recordedTraps(trapTask) : Promise.resolve(null), trapTask)
 
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; unsubscribe.current() } }, [])
   useEffect(() => { window.scrollTo({ top: 0, behavior: 'instant' }) }, [draft.step, batch])
@@ -166,7 +168,8 @@ export default function Run() {
   const [agents, tasks] = query.value
   const actualTask = tasks.find(task => task.id === draft.task) ?? tasks[0]
   const selected = draft.selected.filter(id => agents.some(agent => agent.id === id)).slice(0, 3)
-  const availableTraps = traps.filter(trap => !['fake_article', 'hidden_instruction'].includes(trap.id) || actualTask?.id.endsWith('-trap'))
+  const recordedTrapIds = recorded.value ?? [null]
+  const availableTraps = staticMode ? traps.filter(trap => recordedTrapIds.includes((trap.id || null) as Trap | null)) : traps.filter(trap => !['fake_article', 'hidden_instruction'].includes(trap.id) || actualTask?.id.endsWith('-trap'))
   const actualTrap = availableTraps.find(trap => trap.id === draft.trap) ?? traps[0]
 
   async function start(event: React.FormEvent) {
@@ -241,7 +244,7 @@ export default function Run() {
           {activeCell?.done && <Button asChild variant="outline"><Link to={`?${new URLSearchParams({ batch, run: activeCell.run_id })}`}>Open receipt <ArrowRight size={15} /></Link></Button>}
         </aside>
       </div>
-      <p className="run-provenance">{apiMode ? 'Every agent uses the same frozen document pool. Costs are recorded at list prices.' : 'Demo simulation. No live research or provider spending occurs.'}</p>
+      <p className="run-provenance">{apiMode ? 'Every agent uses the same frozen document pool. Costs are recorded at list prices.' : staticMode ? 'Replay of recorded benchmark runs. No live model calls or provider spending.' : 'Demo simulation. No live research or provider spending occurs.'}</p>
     </div>
   }
 
@@ -265,13 +268,13 @@ export default function Run() {
         {draft.step === 3 && <>
           <div className="run-pane-heading"><h1>Make it harder?</h1><p>A trap shows how an agent behaves when something goes wrong.</p></div>
           <div className="run-traps" role="radiogroup" aria-label="Trap">{availableTraps.map(trap => <label className={`run-option run-trap-option${actualTrap.id === trap.id ? ' run-option-selected' : ''}`} key={trap.id}><input className="sr-only" type="radio" name="benchmark-trap" checked={actualTrap.id === trap.id} disabled={starting} onChange={() => setDraft(previous => ({ ...previous, trap: trap.id }))} /><strong>{trap.label}</strong><span className="run-option-description">{trap.help}</span></label>)}</div>
-          {!actualTask?.id.endsWith('-trap') && <p className="run-trap-note">Choose a task marked “supports planted traps” to test a fake article or hidden instruction.</p>}
-          <dl className="run-summary"><dt>Agents</dt><dd>{selected.map(agentLabel).join(', ')}</dd><dt>Task</dt><dd>{actualTask?.prompt ?? 'Choose a task'}</dd><dt>Trap</dt><dd>{actualTrap.label}</dd><dt>Runs</dt><dd><span className="mono">{selected.length * 3}</span> total, three repeats per agent{apiMode ? ', about 2 to 3 minutes' : ', a few seconds in demo mode'}</dd></dl>
-          {apiMode ? <label className="run-passcode">Team passcode<Input type="password" autoComplete="off" value={passcode} onChange={event => setPasscode(event.target.value)} disabled={starting} /><small>Live runs spend real model budget, so they need the passcode.</small></label> : <p className="run-provenance">This demo simulates progress locally. No searches, model calls or provider spending occur.</p>}
+          {!staticMode && !actualTask?.id.endsWith('-trap') && <p className="run-trap-note">Choose a task marked “supports planted traps” to test a fake article or hidden instruction.</p>}
+          <dl className="run-summary"><dt>Agents</dt><dd>{selected.map(agentLabel).join(', ')}</dd><dt>Task</dt><dd>{actualTask?.prompt ?? 'Choose a task'}</dd><dt>Trap</dt><dd>{actualTrap.label}</dd><dt>Runs</dt><dd><span className="mono">{selected.length * 3}</span> total, three repeats per agent{apiMode ? ', about 2 to 3 minutes' : staticMode ? ', replayed from recorded runs' : ', a few seconds in demo mode'}</dd></dl>
+          {apiMode ? <label className="run-passcode">Team passcode<Input type="password" autoComplete="off" value={passcode} onChange={event => setPasscode(event.target.value)} disabled={starting} /><small>Live runs spend real model budget, so they need the passcode.</small></label> : <p className="run-provenance">{staticMode ? 'Replay of recorded benchmark runs. No live model calls or provider spending.' : 'This demo simulates progress locally. No searches, model calls or provider spending occur.'}</p>}
         </>}
       </motion.section>
     </AnimatePresence>
     {error && <p role="alert" className="run-error">{error}</p>}
-    <div className="run-wizard-actions"><Button variant="outline" type="button" disabled={starting} className={draft.step === 1 ? 'run-back-hidden' : ''} onClick={() => { setDraft(previous => ({ ...previous, step: Math.max(1, previous.step - 1) })); setError('') }}><ArrowLeft size={17} />Back</Button>{draft.step < 3 ? <Button key="next" type="button" disabled={!selected.length || !actualTask} onClick={event => { event.preventDefault(); setDraft(previous => ({ ...previous, step: Math.min(3, previous.step + 1) })) }}>Next <ArrowRight size={18} /></Button> : <Button key="start" type="submit" disabled={starting || !selected.length || !actualTask}>{starting ? 'Starting benchmark…' : 'Start benchmark'}<Play size={17} /></Button>}</div>
+    <div className="run-wizard-actions"><Button variant="outline" type="button" disabled={starting} className={draft.step === 1 ? 'run-back-hidden' : ''} onClick={() => { setDraft(previous => ({ ...previous, step: Math.max(1, previous.step - 1) })); setError('') }}><ArrowLeft size={17} />Back</Button>{draft.step < 3 ? <Button key="next" type="button" disabled={!selected.length || !actualTask} onClick={event => { event.preventDefault(); setDraft(previous => ({ ...previous, step: Math.min(3, previous.step + 1) })) }}>Next <ArrowRight size={18} /></Button> : <Button key="start" type="submit" disabled={starting || !selected.length || !actualTask}>{starting ? staticMode ? 'Starting replay…' : 'Starting benchmark…' : staticMode ? 'Start replay' : 'Start benchmark'}<Play size={17} /></Button>}</div>
   </form>
 }
