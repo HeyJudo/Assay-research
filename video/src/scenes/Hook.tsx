@@ -8,8 +8,8 @@ const LINES = [0.92, 0.78, 0.86, 0.64, 0.8]
 const TRAPPED = [1, 3]
 const VERSIONS = [
   { tag: 'v1 · Baseline', x: 0, rot: -1 },
-  { tag: 'v2 · Cheap-first', x: -560, rot: -4 },
-  { tag: 'v3 · Evidence-gated', x: 560, rot: 4 },
+  { tag: 'v2 · Cheap-first', x: -620, rot: -4 },
+  { tag: 'v3 · Evidence-gated', x: 620, rot: 4 },
 ]
 
 function Brief({ i, typeStart, wrong, better }: { i: number; typeStart: number; wrong: number; better: number }) {
@@ -17,7 +17,7 @@ function Brief({ i, typeStart, wrong, better }: { i: number; typeStart: number; 
   const q = useIn(better + i * 4, { damping: 11, mass: 0.5, stiffness: 200 })
   return (
     <div style={{ position: 'relative' }}>
-      <Paper width={500}>
+      <Paper width={560}>
         <div style={{ display: 'inline-block', fontSize: 19, letterSpacing: 2, color: C.accentDark, background: C.tint, borderRadius: 999, padding: '4px 14px' }}>{VERSIONS[i].tag.toUpperCase()}</div>
         <div style={{ fontFamily: F.head, fontSize: 36, fontWeight: 700, marginTop: 14 }}>Meeting brief</div>
         <Dashed />
@@ -58,7 +58,7 @@ export function Hook() {
           const x = i === 0 ? 0 : v.x * fan
           const y = i === 0 ? (1 - enter) * 600 : (1 - fan) * 80
           return (
-            <div key={i} style={{ position: 'absolute', zIndex: i === 0 ? 2 : 1, opacity: i === 0 ? 1 : fan * (1 - out),
+            <div key={i} style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: i === 0 ? 2 : 1, opacity: i === 0 ? 1 : fan * (1 - out),
               transform: `translate(${x}px, ${y - out * 1100 - 20}px) rotate(${v.rot * (i === 0 ? 1 : fan) - out * 6}deg) scale(${i === 0 ? 1.12 - 0.12 * fan : 1})` }}>
               <Brief i={i} typeStart={i === 0 ? 8 : then + 6} wrong={wrong} better={better} />
             </div>

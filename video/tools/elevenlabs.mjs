@@ -90,7 +90,7 @@ async function music() {
   const ms = Math.round(Object.values(d).reduce((n, x) => n + x.frames, 0) / 30 * 1000) + 3000
   try {
     const r = await call('/v1/music', {
-      prompt: 'Warm, modern, upbeat minimal electronic background bed for a software product demo video. Light plucked synths, soft kick, airy pads, steady 110 bpm, optimistic and focused. Gentle lift around 26 seconds and again around 95 seconds, calm clean ending. Instrumental, mixed low to sit under a voiceover.',
+      prompt: 'Warm, modern, upbeat minimal electronic background bed for a software product demo video. Light plucked synths, soft kick, airy pads, steady 110 bpm, optimistic and focused. Curious, light opening for the first 12 seconds, settle into a steady groove at 24 seconds, gentle lift at 48 seconds when the product demo starts, a warm resolving lift at 112 seconds, calm clean ending. Instrumental, mixed low to sit under a voiceover.',
       music_length_ms: ms, force_instrumental: true,
     })
     fs.writeFileSync(out('music.mp3'), Buffer.from(await r.arrayBuffer()))
