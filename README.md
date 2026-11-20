@@ -1,88 +1,130 @@
-<h1 align="center">
-  <img src="docs/images/assay-wordmark-color.png" alt="Assay" width="340">
-</h1>
+<p align="center">
+  <img src="docs/images/assay-wordmark-color.png" alt="Assay" width="300">
+</p>
 
 <p align="center"><strong>Know which research agent to trust, and why.</strong></p>
 
-Assay tests research agents on the same frozen web pages, repeats each task, and injects controlled failures. A separate model checks claims in completed benchmark briefings against their cited passages. Run receipts show what the agents did, and a leaderboard helps teams choose based on accuracy, cost, resistance to traps, and whether agents admit when evidence is missing.
+<p align="center">
+  <a href="https://heyjudo-assay.static.hf.space"><img src="https://img.shields.io/badge/Live_demo-open-B45309?style=for-the-badge" alt="Live demo"></a>
+  <a href="https://drive.google.com/file/d/17u86gcrxQa9aCrrcDeHq_-4jH2z0gFrF/view"><img src="https://img.shields.io/badge/Demo_video-watch-553D30?style=for-the-badge" alt="Demo video"></a>
+  <a href="https://hackculture.io/hackathons/ai-global-hackathon"><img src="https://img.shields.io/badge/Global_AI_Hackathon-2026-553D30?style=for-the-badge" alt="Global AI Hackathon 2026"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-553D30?style=for-the-badge" alt="MIT license"></a>
+</p>
 
-[Global AI Hackathon 2026](https://hackculture.io/hackathons/ai-global-hackathon) · [Live demo](https://heyjudo-assay.static.hf.space) · [Demo video](https://drive.google.com/file/d/17u86gcrxQa9aCrrcDeHq_-4jH2z0gFrF/view)
+Assay benchmarks research agents on the same frozen web pages, repeats every run three times, plants traps, and checks each claim against its cited source.
 
-| Track | Problem statement | Entry |
-|---|---|---|
-| Primary · Bifrost | PS02 · Agent benchmarking, research category | Repeatable head-to-head tests with run receipts |
-| Integration · Tavily | PS05 · Pre-meeting briefing agent | A live briefing agent whose three versions compete on Assay |
+- **Frozen web.** Every agent searches the same saved Tavily pages, so a score reflects the agent and not the day's search results.
+- **Planted traps.** Fake articles, hidden instructions, search outages and model outages show how each agent fails.
+- **Run receipts.** Every search, page read, model call, cost and claim verdict is recorded for each run.
+- **Priority leaderboard.** Agents are ranked by accuracy, cost, trap resistance and honesty, weighted the way you choose.
+
+<p align="center">
+  <a href="docs/images/leaderboard.png"><img src="docs/images/leaderboard.png" alt="Leaderboard with priority sliders, agent rankings and a cost versus accuracy chart" width="720"></a>
+</p>
+
+## Contents
+
+[Quick start](#quick-start) · [For judges](#for-judges) · [Results](#results) · [How it works](#how-it-works) · [Sponsors](#sponsors) · [Methodology](#methodology) · [Tech stack](#tech-stack) · [How we used AI](#how-we-used-ai) · [Team](#team)
+
+## Quick start
+
+### 1. Try the hosted demo
+
+No install, no keys and no passcode. Open **[heyjudo-assay.static.hf.space](https://heyjudo-assay.static.hf.space)**.
+
+1. Open **Run**. Click **Next** through the preselected agents. Pick a task marked "supports planted traps", click **Next**, then **Start replay**.
+2. When **Results** opens, click a run under **Receipts**. Expand **Show all steps** and read the claim verdicts.
+3. Open **Leaderboard** and drag a priority slider.
+4. Open **Briefing Agent**, pick a recorded brief and a version, then click **Show the recorded brief**.
+
+> [!NOTE]
+> The hosted demo shows the published benchmark: the leaderboard, comparisons and all 136 run receipts, failed runs included. **Run** replays recorded runs and labels them as replays. It makes no live model calls.
+
+### 2. Run it locally with Docker
+
+Live benchmark runs and live briefings need Docker Desktop and your own API keys.
+
+```bash
+git clone https://github.com/HeyJudo/Assay-research.git
+cd Assay-research
+cp .env.example .env        # PowerShell: Copy-Item .env.example .env
+```
+
+Fill in `.env`:
+
+| Setting | What to put there |
+|---|---|
+| `GEMINI_API_KEY` | Google AI Studio key. Runs the benchmark agents and live briefings. |
+| `OPENAI_API_KEY` | OpenAI key for the claim judge. |
+| `ASSAY_JUDGE_MODEL` | The judge model in `openai/<model>` format, for example `openai/gpt-4.1-mini`. |
+| `TAVILY_API_KEY` | Tavily key for live briefings. Benchmarks use the committed pools instead. |
+| `BIFROST_RUN_VK_1` to `BIFROST_RUN_VK_9`, `BIFROST_JUDGE_VK` | Make up a different value for each, starting with `sk-bf-`. They are local Bifrost keys, not provider keys. |
+| `BIFROST_SETUP_TOKEN` | Make up any secret. Bifrost uses it for setup and log access. If you create a Bifrost dashboard admin, also set `BIFROST_ADMIN_USER` and `BIFROST_ADMIN_PASSWORD`. |
+| `RUN_PASSCODE` | Make up a passcode. See below. |
+
+> [!IMPORTANT]
+> **`RUN_PASSCODE` is a password you choose, for example `RUN_PASSCODE=blue-otter-59`.** Live runs and live briefings spend real API budget, so Assay refuses them unless the **Team passcode** you type in the app matches this value exactly. If it is empty, every live request is refused. Opening `http://localhost:8000/?code=<passcode>` fills it in for you.
+
+Start the stack:
+
+```bash
+docker compose up --build
+```
+
+| Address | What it is |
+|---|---|
+| [localhost:8000](http://localhost:8000) | The Assay app |
+| [localhost:8000/docs](http://localhost:8000/docs) | API docs |
+| [localhost:8080](http://localhost:8080) | Bifrost dashboard |
+
+Then run a live batch:
+
+1. Open **Run**. Click **Next** through the preselected agents and Tavily briefing task.
+2. Keep **No trap**, enter your passcode in **Team passcode**, and click **Start benchmark**. A batch takes 1 to 3 minutes.
+3. When **Results** opens, click a run under **Receipts** to see its steps, cost and claim verdicts.
+4. Open **Briefing Agent**, enter a company or person and a meeting time, and click **Write the brief**.
+
+### 3. Try the interface without keys
+
+Requires Node. This mode uses sample results and simulated batches.
+
+```bash
+cd web
+npm ci
+npm run dev
+```
 
 ## For judges
 
-### Open the demo (no install, no keys)
+| Track | Problem statement | Our entry |
+|---|---|---|
+| Primary: Bifrost | PS02, agent benchmarking, research category | Repeatable head-to-head tests with run receipts |
+| Integration: Tavily | PS05, pre-meeting briefing agent | A live briefing agent whose three versions compete on Assay |
 
-[**heyjudo-assay.static.hf.space**](https://heyjudo-assay.static.hf.space) shows the real published benchmark: the leaderboard, head-to-head comparisons and all 136 run receipts, including failed runs. **Run** replays the recorded steps of real benchmark runs and labels them as replays. It makes no live model calls.
-
-1. Open **Run**. Click **Next** through the preselected agents. Pick a task marked "supports planted traps", click **Next**, and click **Start replay**.
-2. When **Results** opens, click a run under **Receipts**. Expand **Show all steps** and inspect the claim verdicts.
-3. Open **Leaderboard** and move a priority slider.
-4. Open **Briefing Agent**, pick a recorded brief and a version, and click **Show the recorded brief**.
-
-To see live runs and live briefings, run the stack yourself with the steps below.
-
-### Run a live batch locally
-
-1. With Docker Desktop running, copy [`.env.example`](.env.example) to `.env`. Set a Google AI Studio key (`GEMINI_API_KEY`), an OpenAI judge key (`OPENAI_API_KEY`), and a Tavily key (`TAVILY_API_KEY`) for live briefings. Set the [local Bifrost values](#run-the-live-stack) and choose a `RUN_PASSCODE`.
-2. Run `docker compose up --build` and open [http://localhost:8000](http://localhost:8000).
-3. Open **Run**. Click **Next** through the preselected agents and Tavily briefing task. Keep **No trap**, enter `RUN_PASSCODE` in **Team passcode**, and click **Start benchmark**. A batch takes about 3 minutes.
-4. When **Results** opens, compare the agents and click a run under **Receipts**. Expand **Show all steps** and inspect the claim verdicts. Open **Leaderboard** and move a priority slider. Then open **Briefing Agent**, enter a company or person and meeting time, and click **Write the brief**.
-
-| Hard requirement | Where to check |
+| Requirement | Where to check |
 |---|---|
-| PS02 · Framework-independent | **Run** includes GPT Researcher alongside Assay's own agents. The [runner](backend/assay/runner.py) passes gateway and proxy settings through environment variables. The [GPT Researcher wrapper](backend/agents/gpt-researcher/run) uses the upstream agent unchanged. |
-| PS02 · Same tasks and recorded metrics | **Run** shows the shared task. **Receipt** shows success, steps, tool calls, tokens, cost and elapsed time. The [run record](backend/assay/models.py) defines those fields. |
-| PS02 · Repeated runs | **Run** shows three repeats per agent. **Leaderboard → More** shows pass³ and accuracy spread. |
-| PS02 · Controlled failures | In **Run**, select **Model outage**, **Search outage** or a planted task's **Hidden instruction** to test a model failure, broken tool or misleading instruction. See the [model outage handler](backend/assay/outage.py) and [search proxy](backend/assay/proxy.py) for the injected failures. |
-| PS02 · Comparison UI and step-by-step traces | **Results** compares agents head to head. Its **Receipts** show the recorded search, read, model and error steps. |
-| PS05 · Company or person plus meeting time | **Briefing Agent** asks for both before starting live research. |
-| PS05 · One-page brief for the last 30 days, with sources and open questions | **Briefing Agent** displays the cited brief and questions to ask in the meeting. The [briefing prompt](backend/agents/briefing_agent.py) asks for one page covering the 30 days before the meeting. |
-| PS05 · Verified and uncertain facts separated | **Briefing Agent** gives **Verified**, **Uncertain** and **Not found** their own sections. |
+| PS02: framework-independent | **Run** includes GPT Researcher next to our own agents. The [runner](backend/assay/runner.py) passes gateway and proxy settings through environment variables, and the [GPT Researcher wrapper](backend/agents/gpt-researcher/run) runs the upstream agent unchanged. |
+| PS02: same tasks, recorded metrics | **Run** gives every agent the same task. **Receipt** shows success, steps, tool calls, tokens, cost and time, as defined in the [run record](backend/assay/models.py). |
+| PS02: repeated runs | **Run** shows three repeats per agent. **Leaderboard → More** shows pass³ and accuracy spread. |
+| PS02: controlled failures | **Run** offers **Fake article**, **Hidden instruction**, **Search outage** and **Model outage**. See the [search proxy](backend/assay/proxy.py) and [model outage handler](backend/assay/outage.py). |
+| PS02: comparison UI and step traces | **Results** compares agents head to head. **Receipts** list every search, page read, model call and error. |
+| PS05: company or person plus meeting time | **Briefing Agent** asks for both before it starts. |
+| PS05: one-page brief for the last 30 days, with sources and questions | **Briefing Agent** shows a cited brief and open questions. The [briefing prompt](backend/agents/briefing_agent.py) covers the 30 days before the meeting. |
+| PS05: verified and uncertain facts separated | **Briefing Agent** gives **Verified**, **Uncertain** and **Not found** their own sections. |
 
-## The problem
+## Results
 
-A research agent can return the right answer once, fail on a repeat, or cite a page that gives no support for its claim. The changing web makes it hard to tell whether a new model, search setting or evidence rule actually improved the result. Assay holds the task and sources fixed so a team can test those changes before relying on an agent for meeting prep or other research. [Research behind the design](docs/PRD.md#why-it-matters-evidence-for-the-deck).
+From the published benchmark: 4 agents, 11 tasks, 3 repeats each, 132 counted runs.
 
-## What Assay does
+| Finding | Number |
+|---|---|
+| Most accurate agent | GPT Researcher, 42% (Baseline 25%) |
+| Its cost per correct answer | 4.7× Baseline ($0.025 vs $0.0053) |
+| Trap resistance | GPT Researcher 50%, our three versions 25% |
+| Evidence-gated accuracy | 17%. Our claim check did not help. |
+| Claim judge agreement with human labels | 48% (24 of 50), so treat claim verdicts as indicative |
 
-- **Freeze the web.** Each task uses a fixed pool of Tavily search results and page text. The same pool goes to every agent in the batch.
-- **Test failure and abstention.** Fake articles, hidden instructions, search outages and model outages test different failure modes. Unanswerable tasks measure whether the agent says “Not found” when the pool lacks the answer.
-- **Grade and compare.** The claim judge checks completed benchmark briefings against the cited pool text. Fact tasks use exact-match grading after normalization. The leaderboard ranks agents by the priorities you set and reports cost per correct answer.
-- **Test a design choice.** **Baseline** uses the main model. **Cheap-first** starts with the smaller model and can switch when a briefing fails a fixed check. **Evidence-gated** checks draft claims and searches again for unsupported ones.
-
-## Screens
-
-**Leaderboard** ranks agents by your priorities and shows cost per correct answer.
-
-<p align="center">
-  <a href="docs/images/leaderboard.png"><img src="docs/images/leaderboard.png" alt="Leaderboard with priority sliders, agent rankings and a cost versus accuracy chart" width="680"></a>
-</p>
-
-| Run a benchmark | Write a meeting brief |
-|:---:|:---:|
-| [![Run screen with agent selection](docs/images/run.png)](docs/images/run.png) | [![Briefing Agent form with company or person, meeting time and agent version](docs/images/briefing.png)](docs/images/briefing.png) |
-| Pick agents, a task and a trap. Compare the runs in **Results**. | Use live search to prepare for a meeting and see how the selected version scored. |
-
-<details>
-<summary>See a run receipt</summary>
-
-Inspect the recorded steps, costs and claim verdicts, with source quotes where available.
-
-![Run receipt with model usage and claim evidence](docs/images/receipt.png)
-
-</details>
-
-<details>
-<summary>See the home screen</summary>
-
-![Home screen with benchmark findings](docs/images/home.png)
-
-</details>
+[Published records](data/results/bench_runs.json) · [Judge agreement](data/judge_agreement.json)
 
 ## How it works
 
@@ -98,86 +140,69 @@ React app --HTTP/SSE--> FastAPI --> SQLite
              run slots         logs searches and reads
 ```
 
-The runner starts each agent as a subprocess. It builds the benchmark trace from Bifrost model-usage logs and the proxy's search and page-read logs. The proxy serves stored pages and blocks requests outside the pool. A supported claim verdict requires a verbatim quote from a cited pool document. The live Briefing Agent uses Tavily directly and returns a brief with its own run receipt.
-
-The runner executes repeats in parallel, with up to three agents per batch. The resumable CLI uses the same runner for the full suite. The app accepts one live batch or briefing at a time.
+- **Runner.** Starts each agent as a subprocess and builds its trace from Bifrost usage logs and the proxy's search and read logs.
+- **Search proxy.** Serves stored pages, blocks anything outside the pool, and injects traps.
+- **Claim judge.** A claim counts as supported only with a verbatim quote from a cited pool document.
+- **Concurrency.** Up to three agents per batch, with repeats in parallel. The app runs one live batch or briefing at a time.
 
 ## Sponsors
 
-- **Bifrost (Maxim AI).** Routes model calls for the agents and judge. Its virtual keys isolate run-slot usage and budgets, and its logs supply tokens, model names and costs for receipts. Assay injects model outages before calls reach the gateway. [Bifrost configuration](bifrost/config.json).
-- **Tavily (Nebius).** Search and Extract build the frozen pools. Live Search powers the Briefing Agent. During benchmarks, the proxy responds in Tavily's API format so existing Tavily clients can use the same frozen sources. [Pool builder](backend/assay/pool_builder.py).
-
-## Tech stack
-
-| Layer | Technology |
-|---|---|
-| Web | React, TypeScript, Vite, Tailwind CSS, shadcn/ui, Recharts |
-| API and storage | Python 3.12, FastAPI, uv, SQLite |
-| Live updates | Server-Sent Events |
-| Agent infrastructure | Bifrost, Tavily, mitmproxy, GPT Researcher |
-| Packaging | Docker and Docker Compose |
-
-## Getting started
-
-### Run the live stack
-
-Install and start Docker Desktop. Clone the repo and copy the environment template. In PowerShell, use `Copy-Item .env.example .env` for the copy step.
-
-```bash
-git clone https://github.com/HeyJudo/Assay-research.git
-cd Assay-research
-cp .env.example .env
-```
-
-Fill in `.env` before starting the stack.
-
-| Setting | Value |
-|---|---|
-| `GEMINI_API_KEY` | Google AI Studio key for the benchmark agents and live briefings |
-| `OPENAI_API_KEY`, `ASSAY_JUDGE_MODEL` | OpenAI API key and a GPT judge model in `openai/<model>` format. See the example in [`.env.example`](.env.example). |
-| `TAVILY_API_KEY` | Tavily API key for live briefings and pool building. The benchmark uses the committed pools. |
-| `BIFROST_RUN_VK_1` through `BIFROST_RUN_VK_9`, `BIFROST_JUDGE_VK` | Choose a distinct local secret for each virtual key. Each value must start with `sk-bf-`. The committed [configuration](bifrost/config.json) reads these values. |
-| `BIFROST_SETUP_TOKEN` | Choose a local secret for initial Bifrost setup and log access. If you create a dashboard admin, also set `BIFROST_ADMIN_USER` and `BIFROST_ADMIN_PASSWORD` in `.env` to the matching login so Assay can read usage logs. |
-| `RUN_PASSCODE` | Choose the passcode you will enter in Run. |
-
-```bash
-docker compose up --build
-```
-
-The app is at [http://localhost:8000](http://localhost:8000), the API docs are at [http://localhost:8000/docs](http://localhost:8000/docs), and the Bifrost dashboard is at [http://localhost:8080](http://localhost:8080). On an empty database, the leaderboard uses the published benchmark records. Receipts for live batches come from local SQLite.
-
-To run the full benchmark with Bifrost running, install Python 3.12 and [uv](https://docs.astral.sh/uv/), export the `.env` values into your shell, and run `uv run python -m assay.bench` from [`backend/`](backend/).
-
-### Try without keys
-
-With Node installed, run these commands from the cloned repo and open the URL Vite prints. This mode uses sample results, simulates batches and shows a sample brief.
-
-```bash
-cd web
-npm ci
-npm run dev
-```
-
-## Deploy
-
-The judging demo runs locally with Docker Compose. FastAPI serves the built web app and API. Compose runs Bifrost as a separate service and persists `assay.db` in the `assay-state` volume.
-
-On a single-container Docker host, supply the same settings as environment secrets and expose port 8000. Leave `BIFROST_URL` unset so the bundled Bifrost starts on localhost. Mount persistent storage at `/app/state` to keep runs across container replacements. [Dockerfile](Dockerfile) · [Compose config](docker-compose.yml).
-
-On a live host, `RUN_PASSCODE` protects benchmark runs and live briefings. Opening `/?code=<passcode>` fills in the passcode on Run and Briefing Agent. [API handlers](backend/assay/api.py).
-
-**Static demo.** `npm run build:static` in [`web/`](web/) builds a server-free site from the snapshot in [`web/public/snapshot/`](web/public/snapshot/). Refresh the snapshot with `uv run python -m assay.snapshot` from [`backend/`](backend/). The public demo is this build on a Hugging Face Static Space ([config](deploy/space-README.md)).
+<table>
+  <tr>
+    <td width="200" align="center">
+      <picture>
+        <source media="(prefers-color-scheme: dark)" srcset="docs/images/brand/bifrost-white.png">
+        <img src="docs/images/brand/bifrost.png" alt="Bifrost" height="32">
+      </picture>
+    </td>
+    <td>Routes every model call for the agents and the judge. Virtual keys give each run slot its own budget, and Bifrost's logs supply the tokens, model names and costs on each receipt. <a href="bifrost/config.json">Configuration</a></td>
+  </tr>
+  <tr>
+    <td width="200" align="center">
+      <picture>
+        <source media="(prefers-color-scheme: dark)" srcset="docs/images/brand/tavily-white.png">
+        <img src="docs/images/brand/tavily.png" alt="Tavily" height="40">
+      </picture>
+    </td>
+    <td>Search and Extract built the frozen page pools, and live Search powers the Briefing Agent. During benchmarks, the proxy answers in Tavily's API format, so existing Tavily clients work unchanged. <a href="backend/assay/pool_builder.py">Pool builder</a></td>
+  </tr>
+</table>
 
 ## Methodology
 
-- **Fixed inputs.** Agents share tasks, source pools and trap seeds. Clean twins keep the same real sources. We tune our agents on separate practice tasks and include GPT Researcher as an outside baseline. Honesty penalizes guessing on unanswerable tasks and refusing answerable ones.
-- **Repeatability.** The published benchmark covers 11 tasks across four agents with three repeats each. pass³ is the share of clean, answerable tasks all three repeats pass. Accuracy spread shows how scores vary between repeats.
-- **Cost and retries.** Assay uses nonzero costs from Bifrost and [list-price token estimates](backend/assay/pricing.json) when Bifrost logs no charge. Failed runs without usage show zero recorded cost. The benchmark can resume and retains failed records, including the four failed benchmark runs that were retried. [Published records](data/results/bench_runs.json).
-- **Claim judge validation.** The judge agreed with the reviewed labels on 24 of 50 claims (48%). Use the quote and verdict in the receipt to inspect individual judgments. [Agreement results](data/judge_agreement.json).
+- **Fixed inputs.** Agents share tasks, page pools and trap seeds. Each trapped task has a clean twin with the same real sources.
+- **No tuning on the benchmark.** We tuned our agents only on separate practice tasks, and GPT Researcher runs as an outside baseline.
+- **Honesty.** Guessing on unanswerable tasks and refusing answerable ones both count against an agent.
+- **Repeatability.** pass³ is the share of clean, answerable tasks where all three repeats pass.
+- **Cost.** Uses Bifrost's recorded cost, or [list-price estimates](backend/assay/pricing.json) when Bifrost logs no charge.
+- **Nothing hidden.** Failed runs stay in the records, including the four errored runs that were retried.
 
-[Methodology rules](docs/PRD.md#9-methodology-rules-non-negotiable-for-credibility) · [Benchmark decisions](docs/PRD.md#13-decisions-log)
+[Methodology rules](docs/PRD.md#9-methodology-rules-non-negotiable-for-credibility) · [Decisions log](docs/PRD.md#13-decisions-log) · [Research behind the design](docs/PRD.md#why-it-matters-evidence-for-the-deck)
 
-## Repo layout
+## Tech stack
+
+<p>
+  <img src="https://skillicons.dev/icons?i=react,ts,vite,tailwind,python,fastapi,sqlite,docker" alt="React, TypeScript, Vite, Tailwind CSS, Python, FastAPI, SQLite, Docker">
+</p>
+
+| Layer | Technology |
+|---|---|
+| Web | React, TypeScript, Vite, Tailwind CSS, shadcn/ui, Recharts, Motion |
+| API and storage | Python 3.12, FastAPI, uv, SQLite, Server-Sent Events |
+| Agent infrastructure | Bifrost, Tavily, mitmproxy, GPT Researcher |
+| Packaging | Docker, Docker Compose, Hugging Face Static Space |
+
+<details>
+<summary>Build and deploy details</summary>
+
+- **Full benchmark.** With Bifrost running, install Python 3.12 and [uv](https://docs.astral.sh/uv/), export the `.env` values, and run `uv run python -m assay.bench` from [`backend/`](backend/).
+- **Static demo.** `npm run build:static` in [`web/`](web/) builds a server-free site from [`web/public/snapshot/`](web/public/snapshot/). Refresh the snapshot with `uv run python -m assay.snapshot` from `backend/`. The hosted demo is this build on a Hugging Face Static Space ([config](deploy/space-README.md)).
+- **Single-container host.** Supply the `.env` values as secrets, expose port 8000, leave `BIFROST_URL` unset so the bundled Bifrost starts, and mount storage at `/app/state`. [Dockerfile](Dockerfile) · [Compose config](docker-compose.yml)
+
+</details>
+
+<details>
+<summary>Repo layout</summary>
 
 | Path | Contents |
 |---|---|
@@ -188,15 +213,27 @@ On a live host, `RUN_PASSCODE` protects benchmark runs and live briefings. Openi
 | [`bifrost/`](bifrost/) | Gateway configuration |
 | [`docs/`](docs/) | [PRD](docs/PRD.md), [hackathon requirements](docs/HACKATHON_CONTEXT.md) and screenshots |
 
+</details>
+
+<details>
+<summary>More screens</summary>
+
+| Run a benchmark | Write a meeting brief |
+|:---:|:---:|
+| [![Run screen with agent selection](docs/images/run.png)](docs/images/run.png) | [![Briefing Agent form](docs/images/briefing.png)](docs/images/briefing.png) |
+
+![Run receipt with model usage and claim evidence](docs/images/receipt.png)
+
+![Home screen with benchmark findings](docs/images/home.png)
+
+</details>
+
 ## How we used AI
 
-### Built with
-
-Claude Code (Anthropic) helped with planning, the spec, code and docs. Codex (OpenAI) helped with code and docs. ElevenLabs generated the demo video's narration, sound effects and music. Claude drafted the 50 judge-validation labels, and a human reviewed each one. Every change was reviewed and merged by a team member.
-
-### Inside the product
-
-The agents under test use Gemini 3.5 Flash-Lite and Gemini 3.1 Flash-Lite via Google AI Studio. An OpenAI GPT model judges claims. All model calls go through Bifrost. Tavily built the frozen web pools and powers live Briefing Agent search.
+- **Building.** Claude Code (Anthropic) helped with planning, the spec, code and docs. Codex (OpenAI) helped with code and docs. Every change was reviewed and merged by a team member.
+- **Judge labels.** Claude drafted the 50 judge-validation labels, and a person reviewed each one.
+- **Demo video.** ElevenLabs generated the narration, sound effects and music.
+- **Inside the product.** The agents under test use Gemini 3.5 Flash-Lite and Gemini 3.1 Flash-Lite. An OpenAI GPT model judges claims. Every model call goes through Bifrost.
 
 ## Team
 
@@ -205,8 +242,12 @@ The agents under test use Gemini 3.5 Flash-Lite and Gemini 3.1 Flash-Lite via Go
 | Member | Role | Work |
 |---|---|---|
 | Jude | Lead | Search proxy, pools, traps, runner, API, Bifrost and deploy |
-| Krystelle | Backend | Briefing Agent and graders |
-| Harvey  | Frontend | Dashboard screens |
+| Krystelle | Backend | Briefing Agent, graders and pricing |
+| Harvey | Frontend | React app, run receipt and leaderboard |
+
+<a href="https://github.com/HeyJudo/Assay-research/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=HeyJudo/Assay-research" alt="Contributors">
+</a>
 
 ## License
 
