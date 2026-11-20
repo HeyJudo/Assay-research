@@ -1,8 +1,8 @@
-<img src="docs/images/assay-wordmark-color.png" alt="Assay" width="300">
+<h1 align="center">
+  <img src="docs/images/assay-wordmark-color.png" alt="Assay" width="340">
+</h1>
 
-# Assay
-
-**Know which research agent to trust, and why.**
+<p align="center"><strong>Know which research agent to trust, and why.</strong></p>
 
 Assay tests research agents on the same frozen web pages, repeats each task, and injects controlled failures. A separate model checks claims in completed benchmark briefings against their cited passages. Run receipts show what the agents did, and a leaderboard helps teams choose based on accuracy, cost, resistance to traps, and whether agents admit when evidence is missing.
 
@@ -15,7 +15,11 @@ Assay tests research agents on the same frozen web pages, repeats each task, and
 
 ## For judges
 
-1. With Docker Desktop running, copy [`.env.example`](.env.example) to `.env`. Set a Google AI Studio key (`GEMINI_API_KEY`), an OpenAI judge key (`OPENAI_API_KEY`), and a Tavily key (`TAVILY_API_KEY`) for live briefings. Set the [local Bifrost values](#getting-started) and choose a `RUN_PASSCODE`.
+**Without provider keys.** [Try the simulated interface](#try-without-keys) or inspect the [published benchmark records](data/results/bench_runs.json).
+
+### Run a live batch locally
+
+1. With Docker Desktop running, copy [`.env.example`](.env.example) to `.env`. Set a Google AI Studio key (`GEMINI_API_KEY`), an OpenAI judge key (`OPENAI_API_KEY`), and a Tavily key (`TAVILY_API_KEY`) for live briefings. Set the [local Bifrost values](#run-the-live-stack) and choose a `RUN_PASSCODE`.
 2. Run `docker compose up --build` and open [http://localhost:8000](http://localhost:8000).
 3. Open **Run**. Click **Next** through the preselected agents and Tavily briefing task. Keep **No trap**, enter `RUN_PASSCODE` in **Team passcode**, and click **Start benchmark**. A batch takes about 3 minutes.
 4. When **Results** opens, compare the agents and click a run under **Receipts**. Expand **Show all steps** and inspect the claim verdicts. Open **Leaderboard** and move a priority slider. Then open **Briefing Agent**, enter a company or person and meeting time, and click **Write the brief**.
@@ -44,15 +48,32 @@ A research agent can return the right answer once, fail on a repeat, or cite a p
 
 ## Screens
 
-| Home | Run | Receipt |
-|---|---|---|
-| ![Home with benchmark findings](docs/images/home.png) | ![Run setup and benchmark progress](docs/images/run.png) | ![Run receipt with model usage and claim evidence](docs/images/receipt.png) |
-| See the headline benchmark findings. | Set up a batch, watch its progress, and compare agents on **Results**. | Inspect the recorded steps, costs and claim verdicts, with source quotes where available. |
+**Leaderboard** ranks agents by your priorities and shows cost per correct answer.
 
-| Leaderboard | Briefing Agent |
-|---|---|
-| ![Leaderboard with priority sliders and agent rankings](docs/images/leaderboard.png) | ![Briefing Agent form and briefing output](docs/images/briefing.png) |
-| Re-rank agents by accuracy, cost, trap resistance and honesty. | Write a sourced brief from live search and see how that agent version scored in the benchmark. |
+<p align="center">
+  <a href="docs/images/leaderboard.png"><img src="docs/images/leaderboard.png" alt="Leaderboard with priority sliders, agent rankings and a cost versus accuracy chart" width="680"></a>
+</p>
+
+| Run a benchmark | Write a meeting brief |
+|:---:|:---:|
+| [![Run screen with agent selection](docs/images/run.png)](docs/images/run.png) | [![Briefing Agent form with company or person, meeting time and agent version](docs/images/briefing.png)](docs/images/briefing.png) |
+| Pick agents, a task and a trap. Compare the runs in **Results**. | Use live search to prepare for a meeting and see how the selected version scored. |
+
+<details>
+<summary>See a run receipt</summary>
+
+Inspect the recorded steps, costs and claim verdicts, with source quotes where available.
+
+![Run receipt with model usage and claim evidence](docs/images/receipt.png)
+
+</details>
+
+<details>
+<summary>See the home screen</summary>
+
+![Home screen with benchmark findings](docs/images/home.png)
+
+</details>
 
 ## How it works
 
@@ -89,6 +110,8 @@ The runner executes repeats in parallel, with up to three agents per batch. The 
 
 ## Getting started
 
+### Run the live stack
+
 Install and start Docker Desktop. Clone the repo and copy the environment template. In PowerShell, use `Copy-Item .env.example .env` for the copy step.
 
 ```bash
@@ -112,15 +135,27 @@ Fill in `.env` before starting the stack.
 docker compose up --build
 ```
 
-The app is at [http://localhost:8000](http://localhost:8000), the API docs are at [http://localhost:8000/docs](http://localhost:8000/docs), and the Bifrost dashboard is at [http://localhost:8080](http://localhost:8080). On an empty database, the leaderboard uses the [published benchmark records](data/results/bench_runs.json). Receipts for live batches come from local SQLite.
+The app is at [http://localhost:8000](http://localhost:8000), the API docs are at [http://localhost:8000/docs](http://localhost:8000/docs), and the Bifrost dashboard is at [http://localhost:8080](http://localhost:8080). On an empty database, the leaderboard uses the published benchmark records. Receipts for live batches come from local SQLite.
 
-With Node installed, run `npm ci` and `npm run dev` in [`web/`](web/) to try the simulated frontend without provider keys. To run the full benchmark with Bifrost running, install Python 3.12 and [uv](https://docs.astral.sh/uv/), export the `.env` values into your shell, and run `uv run python -m assay.bench` from [`backend/`](backend/).
+To run the full benchmark with Bifrost running, install Python 3.12 and [uv](https://docs.astral.sh/uv/), export the `.env` values into your shell, and run `uv run python -m assay.bench` from [`backend/`](backend/).
+
+### Try without keys
+
+With Node installed, run these commands from the cloned repo and open the URL Vite prints. This mode uses sample results, simulates batches and shows a sample brief.
+
+```bash
+cd web
+npm ci
+npm run dev
+```
 
 ## Deploy
 
 The judging demo runs locally with Docker Compose. FastAPI serves the built web app and API. Compose runs Bifrost as a separate service and persists `assay.db` in the `assay-state` volume.
 
 On a single-container Docker host, supply the same settings as environment secrets and expose port 8000. Leave `BIFROST_URL` unset so the bundled Bifrost starts on localhost. Mount persistent storage at `/app/state` to keep runs across container replacements. [Dockerfile](Dockerfile) · [Compose config](docker-compose.yml).
+
+Judges can use a hosted instance with the team's provider keys stored on the server. Restrict access to invited judges. `RUN_PASSCODE` protects benchmark runs, while the live Briefing Agent has no passcode check. [API handlers](backend/assay/api.py).
 
 ## Methodology
 
@@ -154,11 +189,13 @@ The agents under test use Gemini 3.5 Flash-Lite and Gemini 3.1 Flash-Lite via Go
 
 ## Team
 
-| Role | Work |
-|---|---|
-| Lead (Jude) | Search proxy, pools, traps, runner, API, Bifrost and deploy |
-| Backend | Briefing Agent and graders |
-| Frontend | Dashboard screens |
+**Legendary Birds**
+
+| Member | Role | Work |
+|---|---|---|
+| Jude | Lead | Search proxy, pools, traps, runner, API, Bifrost and deploy |
+|  | Backend | Briefing Agent and graders |
+|  | Frontend | Dashboard screens |
 
 ## License
 
