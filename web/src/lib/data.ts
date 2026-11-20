@@ -2,18 +2,21 @@ import { connectBatchStream } from './batch-stream'
 import { registerAgents, agentLabel } from './agent-names'
 import { readStored, writeStored } from './run-session'
 import { agents, leaderboard, runs, tasks } from '@/fixtures'
-import type { Agent, BatchEvent, BatchRequest, LeaderboardRow, RunRecord, RunSummary, Task } from '@/types'
+import { pickReplayRuns, recordedBriefs, recordedTraps } from './replay.ts'
+import type { Agent, BatchEvent, BatchRequest, LeaderboardRow, RunRecord, RunSummary, Task, Trap } from '@/types'
 
 /** Explicit opt-in. API failures never silently turn into fixture results. */
 export const apiMode = import.meta.env.VITE_DATA_MODE === 'api'
-export const sampleData = !apiMode || import.meta.env.VITE_RESULTS_ARE_FIXTURES !== 'false'
+/** Free judge demo: published snapshot files, replayed runs, no server. */
+export const staticMode = import.meta.env.VITE_DATA_MODE === 'static'
+export const sampleData = !staticMode && (!apiMode || import.meta.env.VITE_RESULTS_ARE_FIXTURES !== 'false')
 registerAgents(agents)
 const base = (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/$/, '')
 const savedRuns = new Map<string, RunRecord>()
 const simulatedBatches = new Map<string, RunRecord[]>()
 const demoPositions = new Map<string, number>()
 if (!apiMode) {
-  const stored = readStored<RunRecord[]>('assay:demo-records')
+  const stored = staticMode ? null : readStored<RunRecord[]>('assay:demo-records')
   if (Array.isArray(stored)) for (const record of stored) {
     if (!record || typeof record.id !== 'string' || typeof record.batch_id !== 'string' || !Array.isArray(record.steps) || !record.metrics || !record.config || !record.output) continue
     savedRuns.set(record.id, record)
@@ -26,6 +29,30 @@ if (!apiMode) {
     if (Number.isInteger(position) && position >= 0) demoPositions.set(id, position)
   }
 }
+type Snapshot = { agents: Agent[]; tasks: Task[]; leaderboard: LeaderboardRow[]; runs: RunRecord[] }
+const REPLAY_KEY = 'assay:replay-batches'
+let snapshot: Promise<Snapshot> | undefined
+function loadSnapshot(): Promise<Snapshot> {
+  snapshot ??= (async () => {
+    const get = async <T>(name: string): Promise<T> => {
+      const response = await fetch(`${import.meta.env.BASE_URL}snapshot/${name}.json`)
+      if (!response.ok) throw new Error(`Unable to load the published results (${response.status}).`)
+      return response.json()
+    }
+    const [agents, tasks, leaderboard, runs] = await Promise.all([get<Agent[]>('agents'), get<Task[]>('tasks'), get<LeaderboardRow[]>('leaderboard'), get<RunRecord[]>('runs')])
+    registerAgents(agents)
+    const byId = new Map(runs.map(r => [r.id, r]))
+    const stored = readStored<Record<string, string[]>>(REPLAY_KEY)
+    if (stored && typeof stored === 'object') for (const [batch, ids] of Object.entries(stored)) {
+      const records = Array.isArray(ids) ? ids.map(id => byId.get(id)).filter((r): r is RunRecord => !!r) : []
+      if (batch.startsWith('replay_') && records.length) simulatedBatches.set(batch, records)
+    }
+    return { agents, tasks, leaderboard, runs }
+  })()
+  snapshot.catch(() => { snapshot = undefined })  // allow retry after a failed load
+  return snapshot
+}
+
 function persistDemoRecords() { writeStored('assay:demo-records', [...savedRuns.values()]) }
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
@@ -38,18 +65,50 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   return response.json()
 }
 
+function playDemo(id: string, receive: (event: BatchEvent) => void, fail: (message: string) => void): () => void {
+    const records = simulatedBatches.get(id) ?? []
+    if (!records.length) { fail(staticMode ? 'This replay is unavailable in this browser. Start a new replay.' : 'This demo batch is unavailable in this browser. Start a new benchmark.'); return () => {} }
+    const events: BatchEvent[] = records.map(r => ({ event: 'run_started', data: { run_id: r.id, batch_id: id, agent_id: r.agent_id, repeat: r.repeat, started_at: r.started_at } }))
+    for (let i = 0; i < Math.max(...records.map(r => r.steps.length)); i++) records.forEach(r => { const step = r.steps[i]; if (step) events.push({ event: 'step', data: { run_id: r.id, step } }) })
+    records.forEach(r => events.push({ event: 'run_done', data: { run_id: r.id, status: r.status as 'done' | 'error' | 'budget_exceeded', duration_s: r.duration_s!, metrics: r.metrics } }))
+    events.push({ event: 'batch_done', data: { batch_id: id } })
+    let index = Math.min(demoPositions.get(id) ?? 0, events.length - 1)
+    // Replaying the prefix is idempotent and covers a refresh between saving the
+    // event cursor and React committing the corresponding session snapshot.
+    for (let replay = 0; replay < index; replay++) receive(events[replay])
+    const timer = window.setInterval(() => {
+      if (index < events.length) receive(events[index++])
+      demoPositions.set(id, index)
+      writeStored('assay:demo-progress', Object.fromEntries(demoPositions))
+      if (index >= events.length) window.clearInterval(timer)
+    }, 160)
+    return () => window.clearInterval(timer)
+}
+
 export const data = {
-  agents: async () => { const list = apiMode ? await request<Agent[]>('/agents') : agents; registerAgents(list); return list },
-  tasks: () => apiMode ? request<Task[]>('/tasks') : Promise.resolve(tasks),
-  leaderboard: () => apiMode ? request<LeaderboardRow[]>('/leaderboard') : Promise.resolve(leaderboard),
-  runs: async (batch?: string): Promise<RunSummary[]> => apiMode ? request(`/runs${batch ? `?batch_id=${encodeURIComponent(batch)}` : ''}`) : [...savedRuns.values(), ...runs].filter(r => !batch || r.batch_id === batch),
+  agents: async () => { if (staticMode) return (await loadSnapshot()).agents; const list = apiMode ? await request<Agent[]>('/agents') : agents; registerAgents(list); return list },
+  tasks: () => staticMode ? loadSnapshot().then(s => s.tasks) : apiMode ? request<Task[]>('/tasks') : Promise.resolve(tasks),
+  leaderboard: () => staticMode ? loadSnapshot().then(s => s.leaderboard) : apiMode ? request<LeaderboardRow[]>('/leaderboard') : Promise.resolve(leaderboard),
+  runs: async (batch?: string): Promise<RunSummary[]> => staticMode ? loadSnapshot().then(s => !batch ? s.runs : batch.startsWith('replay_') ? simulatedBatches.get(batch) ?? [] : s.runs.filter(r => r.batch_id === batch)) : apiMode ? request(`/runs${batch ? `?batch_id=${encodeURIComponent(batch)}` : ''}`) : [...savedRuns.values(), ...runs].filter(r => !batch || r.batch_id === batch),
   run: async (id: string): Promise<RunRecord> => {
+    if (staticMode) {
+      const run = (await loadSnapshot()).runs.find(r => r.id === id)
+      if (!run) throw new Error('Run not found in the published results.')
+      return run
+    }
     if (apiMode) return request(`/runs/${encodeURIComponent(id)}`)
     const run = savedRuns.get(id) ?? runs.find(r => r.id === id)
     if (!run) throw new Error('Run not found. Open an existing receipt or start a new demo benchmark.')
     return run
   },
   batch: async (config: BatchRequest) => {
+    if (staticMode) {
+      const records = pickReplayRuns((await loadSnapshot()).runs, config.agents, config.task_id, config.trap)
+      const batch_id = `replay_${Date.now()}`
+      simulatedBatches.set(batch_id, records)
+      writeStored(REPLAY_KEY, Object.fromEntries([...simulatedBatches].filter(([k]) => k.startsWith('replay_')).map(([k, v]) => [k, v.map(r => r.id)])))
+      return { batch_id }
+    }
     if (apiMode) return request<{ batch_id: string }>('/batches', { method: 'POST', body: JSON.stringify(config) })
     const batch_id = `demo_${Date.now()}`
     const task = tasks.find(t => t.id === config.task_id)!
@@ -95,26 +154,17 @@ export const data = {
     if (apiMode) {
       return connectBatchStream(`${base}/api/batches/${encodeURIComponent(id)}/stream`, receive, fail)
     }
-    const records = simulatedBatches.get(id) ?? []
-    if (!records.length) { fail('This demo batch is unavailable in this browser. Start a new benchmark.'); return () => {} }
-    const events: BatchEvent[] = records.map(r => ({ event: 'run_started', data: { run_id: r.id, batch_id: id, agent_id: r.agent_id, repeat: r.repeat, started_at: r.started_at } }))
-    for (let i = 0; i < Math.max(...records.map(r => r.steps.length)); i++) records.forEach(r => { const step = r.steps[i]; if (step) events.push({ event: 'step', data: { run_id: r.id, step } }) })
-    records.forEach(r => events.push({ event: 'run_done', data: { run_id: r.id, status: 'done', duration_s: r.duration_s!, metrics: r.metrics } }))
-    events.push({ event: 'batch_done', data: { batch_id: id } })
-    let index = Math.min(demoPositions.get(id) ?? 0, events.length - 1)
-    // Replaying the prefix is idempotent and covers a refresh between saving the
-    // event cursor and React committing the corresponding session snapshot.
-    for (let replay = 0; replay < index; replay++) receive(events[replay])
-    const timer = window.setInterval(() => {
-      if (index < events.length) receive(events[index++])
-      demoPositions.set(id, index)
-      writeStored('assay:demo-progress', Object.fromEntries(demoPositions))
-      if (index >= events.length) window.clearInterval(timer)
-    }, 160)
-    return () => window.clearInterval(timer)
+    if (staticMode) {
+      let stop = () => {}
+      let cancelled = false
+      loadSnapshot().then(() => { if (!cancelled) stop = playDemo(id, receive, fail) }, reason => fail(reason instanceof Error ? reason.message : 'Unable to load the published results.'))
+      return () => { cancelled = true; stop() }
+    }
+    return playDemo(id, receive, fail)
   },
-  brief: async (subject: string, meeting_time: string, version: string): Promise<{ run_id: string }> => {
-    if (apiMode) return request('/brief', { method: 'POST', body: JSON.stringify({ subject, meeting_time, version }) })
+  brief: async (subject: string, meeting_time: string, version: string, passcode: string): Promise<{ run_id: string }> => {
+    if (staticMode) throw new Error('Static mode shows recorded briefs only.')
+    if (apiMode) return request('/brief', { method: 'POST', body: JSON.stringify({ subject, meeting_time, version, passcode }) })
     await new Promise(resolve => setTimeout(resolve, 800))
     const record = structuredClone(runs[0])
     record.id = `demo_brief_${Date.now()}`
@@ -132,4 +182,6 @@ export const data = {
     persistDemoRecords()
     return { run_id: record.id }
   },
+  recordedBriefs: async (version: string): Promise<RunRecord[]> => recordedBriefs((await loadSnapshot()).runs, version),
+  recordedTraps: async (taskId: string): Promise<(Trap | null)[]> => recordedTraps((await loadSnapshot()).runs, taskId),
 }

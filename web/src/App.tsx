@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { BrowserRouter, Link, Navigate, NavLink, Route, Routes, useLocation, useParams } from 'react-router'
+import { BrowserRouter, HashRouter, Link, Navigate, NavLink, Route, Routes, useLocation, useParams } from 'react-router'
 import { MotionConfig } from 'motion/react'
 import { ReceiptText } from 'lucide-react'
 import Briefing from '@/pages/Briefing'
@@ -8,7 +8,7 @@ import Home from '@/pages/Home'
 import Leaderboard from '@/pages/Leaderboard'
 import Receipt from '@/pages/Receipt'
 import Run from '@/pages/Run'
-import { sampleData } from '@/lib/data'
+import { sampleData, staticMode } from '@/lib/data'
 import { Button } from '@/components/ui/button'
 import { RouteTransition } from '@/components/route-transition'
 
@@ -60,6 +60,8 @@ function Shell() {
   </div>
 }
 
+const Router = staticMode ? HashRouter : BrowserRouter
+
 export default function App() {
-  return <BrowserRouter><MotionConfig reducedMotion="user" transition={{ type: 'spring', bounce: 0, duration: .45 }}><Shell /></MotionConfig></BrowserRouter>
+  return <Router><MotionConfig reducedMotion="user" transition={{ type: 'spring', bounce: 0, duration: .45 }}><Shell /></MotionConfig></Router>
 }

@@ -6,7 +6,7 @@
 
 Assay tests research agents on the same frozen web pages, repeats each task, and injects controlled failures. A separate model checks claims in completed benchmark briefings against their cited passages. Run receipts show what the agents did, and a leaderboard helps teams choose based on accuracy, cost, resistance to traps, and whether agents admit when evidence is missing.
 
-[Global AI Hackathon 2026](https://hackculture.io/hackathons/ai-global-hackathon) · [Demo video](<VIDEO_URL>)
+[Global AI Hackathon 2026](https://hackculture.io/hackathons/ai-global-hackathon) · [Live demo](https://heyjudo-assay.static.hf.space) · [Demo video](<VIDEO_URL>)
 
 | Track | Problem statement | Entry |
 |---|---|---|
@@ -15,7 +15,16 @@ Assay tests research agents on the same frozen web pages, repeats each task, and
 
 ## For judges
 
-**Without provider keys.** [Try the simulated interface](#try-without-keys) or inspect the [published benchmark records](data/results/bench_runs.json).
+### Open the demo (no install, no keys)
+
+[**heyjudo-assay.static.hf.space**](https://heyjudo-assay.static.hf.space) shows the real published benchmark: the leaderboard, head-to-head comparisons and all 136 run receipts, including failed runs. **Run** replays the recorded steps of real benchmark runs and labels them as replays. It makes no live model calls.
+
+1. Open **Run**. Click **Next** through the preselected agents. Pick a task marked "supports planted traps", click **Next**, and click **Start replay**.
+2. When **Results** opens, click a run under **Receipts**. Expand **Show all steps** and inspect the claim verdicts.
+3. Open **Leaderboard** and move a priority slider.
+4. Open **Briefing Agent**, pick a recorded brief and a version, and click **Show the recorded brief**.
+
+To see live runs and live briefings, run the stack yourself with the steps below.
 
 ### Run a live batch locally
 
@@ -155,7 +164,9 @@ The judging demo runs locally with Docker Compose. FastAPI serves the built web 
 
 On a single-container Docker host, supply the same settings as environment secrets and expose port 8000. Leave `BIFROST_URL` unset so the bundled Bifrost starts on localhost. Mount persistent storage at `/app/state` to keep runs across container replacements. [Dockerfile](Dockerfile) · [Compose config](docker-compose.yml).
 
-Judges can use a hosted instance with the team's provider keys stored on the server. Restrict access to invited judges. `RUN_PASSCODE` protects benchmark runs, while the live Briefing Agent has no passcode check. [API handlers](backend/assay/api.py).
+On a live host, `RUN_PASSCODE` protects benchmark runs and live briefings. Opening `/?code=<passcode>` fills in the passcode on Run and Briefing Agent. [API handlers](backend/assay/api.py).
+
+**Static demo.** `npm run build:static` in [`web/`](web/) builds a server-free site from the snapshot in [`web/public/snapshot/`](web/public/snapshot/). Refresh the snapshot with `uv run python -m assay.snapshot` from [`backend/`](backend/). The public demo is this build on a Hugging Face Static Space ([config](deploy/space-README.md)).
 
 ## Methodology
 

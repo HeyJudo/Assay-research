@@ -168,8 +168,14 @@ def test_tasks_are_the_benchmark_suite_without_practice(client):
     assert (hinton["type"], hinton["answer"]) == ("fact", "1582")  # from data/tasks/fact-hinton-university-trap.json
 
 
-BRIEF_BODY = {"subject": "Tavily", "meeting_time": "2026-11-20T01:00:00Z", "version": "briefing-baseline"}
+BRIEF_BODY = {"subject": "Tavily", "meeting_time": "2026-11-20T01:00:00Z", "version": "briefing-baseline",
+              "passcode": "test-passcode"}
 BRIEF_TEXT = "## Verified\n- News [source](https://tavily.com)\n## Uncertain\nNone\n## Not found\nNone\n## Open questions\n- Priorities?"
+
+
+@pytest.fixture(autouse=True)
+def run_passcode(monkeypatch):
+    monkeypatch.setenv("RUN_PASSCODE", "test-passcode")
 
 
 @pytest.fixture
@@ -245,6 +251,22 @@ def test_live_brief_running_to_done(client, briefing, version):
     assert os.environ["OPENAI_API_KEY"] == "parent-key" and os.environ["NO_PROXY"] == "parent-host"
 
 
+def test_brief_wrong_passcode_is_403(client, briefing):
+    assert client.post("/api/brief", json={**BRIEF_BODY, "passcode": "nope"}).status_code == 403
+    assert not briefing.entered.is_set()
+
+
+def test_brief_unset_server_passcode_is_403(client, briefing, monkeypatch):
+    monkeypatch.delenv("RUN_PASSCODE")
+    assert client.post("/api/brief", json=BRIEF_BODY).status_code == 403
+
+
+def test_rejected_brief_does_not_take_the_lock(client, briefing):
+    assert client.post("/api/brief", json={**BRIEF_BODY, "passcode": "nope"}).status_code == 403
+    briefing.release.set()
+    assert client.post("/api/brief", json=BRIEF_BODY).status_code == 200
+
+
 def test_live_brief_unknown_version(client):
     assert client.post("/api/brief", json={**BRIEF_BODY, "version": "briefing-nope"}).status_code == 422
 
@@ -264,8 +286,7 @@ def test_live_brief_refuses_running_batch(client, monkeypatch):
     assert client.post("/api/brief", json=BRIEF_BODY).status_code == 409
 
 
-def test_batch_refuses_running_brief(client, briefing, monkeypatch):
-    monkeypatch.setenv("RUN_PASSCODE", "test-passcode")
+def test_batch_refuses_running_brief(client, briefing):
     client.post("/api/brief", json=BRIEF_BODY)
     assert briefing.entered.wait(5)
     response = client.post("/api/batches", json={"agents": ["briefing-baseline"], "task_id": "brief-tavily",

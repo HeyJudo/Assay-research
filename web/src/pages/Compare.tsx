@@ -26,8 +26,9 @@ const metricDefinitions = [
 
 function ReceiptGrid({ records, params }: { records: RunSummary[]; params: URLSearchParams }) {
   const groups = new Map<string, RunSummary[]>()
+  const replay = params.get('scope') === 'batch' && (params.get('batch') ?? '').startsWith('replay_')
   records.forEach(run => {
-    const key = `${run.batch_id}:${run.task_id}:${run.trap ?? 'clean'}`
+    const key = `${replay ? 'replay' : run.batch_id}:${run.task_id}:${run.trap ?? 'clean'}`
     groups.set(key, [...(groups.get(key) ?? []), run])
   })
   return <div className="results-receipt-groups">{[...groups.entries()].map(([group, runs]) => <div key={group} className="results-receipt-group">
@@ -77,7 +78,7 @@ export default function Results() {
       <div className="results-hero-main"><span className="results-trophy"><Trophy size={36} /></span><div><h1 id="results-title">{verdict.title}</h1><p>{verdict.description}</p></div></div>
       <div className="results-headline-number"><div className="mono"><CountUp value={verdict.value} format={value => `${Math.round(value)}${verdict.label.includes('percentage points') ? '' : '%'}`} /></div><span>{verdict.label}</span></div>
     </motion.section>
-    {(sampleData || batch.startsWith('demo_')) && <p className="results-data-note">{scope === 'batch' ? 'Demo simulation. These outcomes demonstrate the interface and are not benchmark findings.' : 'Sample results. Illustrative aggregates are shown with their available example receipts.'}</p>}
+    {(sampleData || batch.startsWith('demo_') || (batch.startsWith('replay_') && scope === 'batch')) && <p className="results-data-note">{batch.startsWith('replay_') && scope === 'batch' ? 'Replay of recorded benchmark runs.' : scope === 'batch' ? 'Demo simulation. These outcomes demonstrate the interface and are not benchmark findings.' : 'Sample results. Illustrative aggregates are shown with their available example receipts.'}</p>}
     <div className="results-controls">
       <div className="results-agent-pickers"><span className="results-swatch agent-a" aria-hidden="true" /><Select value={aId || 'unavailable'} onValueChange={value => update('a', value)} disabled={!ids.length}><SelectTrigger aria-label="First agent"><SelectValue placeholder="First agent" /></SelectTrigger><SelectContent>{ids.map(id => <SelectItem value={id} key={id}>{agentLabel(id)}</SelectItem>)}</SelectContent></Select><span className="results-against">against</span><span className="results-swatch agent-b" aria-hidden="true" /><Select value={bId || 'unavailable'} onValueChange={value => update('b', value)} disabled={ids.length < 2}><SelectTrigger aria-label="Second agent">{ids.length < 2 ? <span>One agent</span> : <SelectValue placeholder="Second agent" />}</SelectTrigger><SelectContent>{ids.map(id => <SelectItem value={id} key={id}>{agentLabel(id)}</SelectItem>)}</SelectContent></Select></div>
       <Tabs value={scope} onValueChange={value => update('scope', value)} className="results-scope"><TabsList aria-label="Results scope"><TabsTrigger value="batch" disabled={!batch}>This batch</TabsTrigger><TabsTrigger value="full">Full benchmark</TabsTrigger></TabsList></Tabs>

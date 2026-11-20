@@ -5,7 +5,7 @@ import { CircleCheck, List, Repeat, Sliders, Snowflake, TriangleAlert as TrapSta
 import { Button } from '@/components/ui/button'
 import { LoadState } from '@/components/shared'
 import { BuiltOn, HomeAgents } from '@/components/home-agents'
-import { apiMode, data, sampleData } from '@/lib/data'
+import { apiMode, data, sampleData, staticMode } from '@/lib/data'
 import { useData } from '@/lib/use-data'
 import { agentLabel, defaultWeights, money, percent, rankRows } from '@/lib/metrics'
 import './home.css'
@@ -41,7 +41,7 @@ export default function Home() {
       <motion.div className="home-pitch" {...reveal}>
         <h1>Know what your research agent does when the web <span>lies</span>.</h1>
         <p>Assay runs research agents on a frozen web, plants traps, and keeps a receipt for every claim.</p>
-        <div className="home-actions"><Button asChild><Link to="/run">{apiMode ? 'Run a live benchmark' : 'Run a demo benchmark'}<ArrowRight size={17} /></Link></Button><Button asChild variant="outline"><Link to="/briefing"><BriefcaseBusiness size={17} />Try the Briefing Agent</Link></Button></div>
+        <div className="home-actions"><Button asChild><Link to="/run">{apiMode ? 'Run a live benchmark' : staticMode ? 'Replay a benchmark run' : 'Run a demo benchmark'}<ArrowRight size={17} /></Link></Button><Button asChild variant="outline"><Link to="/briefing"><BriefcaseBusiness size={17} />Try the Briefing Agent</Link></Button></div>
       </motion.div>
       <div className="home-receipt-wrap">
         {receipt ? <motion.div className="home-paper" animate={reduced ? { rotate: 0 } : { rotate: [1.2, .4, 1.2], y: [0, -8, 0] }} transition={{ duration: 6, repeat: Infinity, ease: 'easeInOut' }}>
@@ -83,6 +83,6 @@ export default function Home() {
       <div className="home-board-wrap"><table className="home-board"><thead><tr><th>Agent</th><th>Accuracy</th><th>Cost / correct</th><th>Trap resistance</th></tr></thead><tbody>{ranked.slice(0, 5).map((row, index) => <tr key={row.agent_id}><th scope="row"><Link to={`/results?scope=full&a=${encodeURIComponent(row.agent_id)}`}><span className={`home-rank mono ${index === 0 ? 'home-rank-first' : ''}`}>{index + 1}</span>{agentLabel(row.agent_id)}{agents.find(agent => agent.id === row.agent_id)?.kind === 'outside' && <span className="home-outside">outside</span>}</Link></th><td><div className="home-accuracy"><span className="home-bar-track"><motion.b initial={reduced ? false : { scaleX: 0 }} whileInView={{ scaleX: Math.max(0, Math.min(1, row.accuracy ?? 0)) }} viewport={{ once: true }} transition={{ type: 'spring', bounce: 0, duration: .7 }} style={{ background: index === 0 ? 'var(--primary)' : undefined }} /></span><Link className="mono" to={`/results?scope=full&a=${encodeURIComponent(row.agent_id)}`}>{percent(row.accuracy)}</Link></div></td><td className="mono"><Link to={`/results?scope=full&a=${encodeURIComponent(row.agent_id)}`}>{money(row.cost_per_correct)}</Link></td><td className="mono"><Link to={`/results?scope=full&a=${encodeURIComponent(row.agent_id)}`}>{percent(row.trap_resistance)}</Link></td></tr>)}</tbody></table></div>
       <p className="home-cost-note">Cost is list-price equivalent. Free-tier billing may be $0. Failed runs without usage have $0 recorded cost.</p>
     </motion.section>
-    <motion.section className="home-cta" {...reveal}><div><h2>See it for yourself.</h2><p>Pick two agents, add a trap, and watch them work. {apiMode ? 'It takes about three minutes.' : 'The demo runs locally in a few seconds.'}</p></div><Button asChild variant="outline"><Link to="/run"><Play size={17} />Start a benchmark</Link></Button></motion.section>
+    <motion.section className="home-cta" {...reveal}><div><h2>See it for yourself.</h2><p>Pick two agents, add a trap, and watch them work. {apiMode ? 'It takes about three minutes.' : staticMode ? 'The replay plays back real recorded runs.' : 'The demo runs locally in a few seconds.'}</p></div><Button asChild variant="outline"><Link to="/run"><Play size={17} />{staticMode ? 'Replay a benchmark run' : 'Start a benchmark'}</Link></Button></motion.section>
   </div>
 }
