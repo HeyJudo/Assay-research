@@ -1,7 +1,7 @@
 .briefing-page { padding: 40px 0 96px; display: flex; flex-wrap: wrap; gap: 48px; align-items: flex-start; }
-.briefing-form { flex: 1 1 300px; max-width: 380px; min-width: 0; display: flex; flex-direction: column; gap: 20px; }
+.briefing-form { flex: 1 1 360px; max-width: 380px; min-width: 0; display: flex; flex-direction: column; gap: 20px; }
 .briefing-intro { display: flex; flex-direction: column; gap: 8px; }
-.briefing-intro h1 { font-size: 36px; line-height: 1.1; letter-spacing: -.025em; font-weight: 600; }
+.briefing-intro h1 { font-size: 32px; text-wrap: balance; line-height: 1.1; letter-spacing: -.025em; font-weight: 600; }
 .briefing-intro p { font-size: 16px; line-height: 1.5; color: var(--muted-foreground); }
 .briefing-form>label,.briefing-version { display: flex; flex-direction: column; gap: 8px; font-size: 15px; font-weight: 500; }
 .briefing-form [data-slot="input"],.briefing-form [data-slot="select-trigger"] { width: 100%; min-height: 48px; border-radius: 6px; border: 1px solid var(--input); background: var(--card); padding: 0 14px; font-size: 16px; font-weight: 400; color: var(--foreground); }
@@ -15,27 +15,40 @@
 .briefing-mode-note { font-size: 12px; color: var(--muted-foreground); line-height: 1.5; }
 .briefing-paper { flex: 999 1 560px; min-width: 0; background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 32px 36px; display: flex; flex-direction: column; gap: 28px; }
 .briefing-paper-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap; }
-.briefing-paper-header>div { min-width: 0; }
+.briefing-paper-header>div { min-width: 0; flex: 1 1 320px; }
+.briefing-paper-header [data-slot="button"] { flex: none; }
 .briefing-paper-header h2 { font-size: 28px; font-weight: 600; letter-spacing: -.02em; line-height: 1.2; overflow-wrap: anywhere; }
-.briefing-paper-header p { margin-top: 6px; font-size: 12px; line-height: 1.6; color: var(--muted-foreground); }
+.briefing-paper-header .briefing-meta { margin-top: 6px; font-size: 14px; line-height: 1.6; color: var(--muted-foreground); }
+.briefing-meta .mono { color: var(--foreground); }
 .briefing-paper-header [data-slot="button"] { min-height: 44px; padding-inline: 16px; font-size: 15px; gap: 8px; }
 .briefing-output-section { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
 .briefing-output-section>h3 { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; font-size: 17px; font-weight: 600; line-height: 1.4; }
-.briefing-section-badge { display: inline-block; font-family: var(--font-sans); font-size: 12px; font-weight: 600; border-radius: 999px; padding: 4px 10px; background: var(--muted); color: var(--foreground); }
+.briefing-output-section>h3 span:not(.briefing-section-badge), .briefing-section-preview li>span:not(.briefing-section-badge) { font-family: var(--font-sans); font-weight: 500; font-size: 15px; color: var(--muted-foreground); }
+.briefing-section-badge { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-width: 144px; font-family: var(--font-sans); font-size: 13px; font-weight: 600; border-radius: 999px; padding: 4px 12px; background: var(--muted); color: var(--foreground); }
 .briefing-output-verified .briefing-section-badge { color: var(--success); background: #e3efe8; }
 .briefing-output-uncertain .briefing-section-badge { color: #7a5518; background: #fbf3df; }
-.briefing-output-section .brief-text { font-size: 16px; line-height: 1.5; display: flex; flex-direction: column; gap: 10px; overflow-wrap: anywhere; }
+.briefing-output-section .brief-text { font-size: 16px; line-height: 1.55; display: flex; flex-direction: column; gap: 10px; overflow-wrap: anywhere; overflow-x: clip; }
+.brief-text ul { margin: 0; padding-left: 22px; display: flex; flex-direction: column; gap: 10px; list-style: disc; }
+.brief-text li::marker { color: var(--primary); }
 .briefing-output-section .brief-text p { margin: 0; }
-.briefing-output-section .brief-text a { font-family: var(--font-mono); font-size: 12px; color: var(--primary); }
-.briefing-placeholder { display: flex; flex-direction: column; gap: 12px; padding: 40px 0 24px; color: var(--muted-foreground); font-size: 15px; line-height: 1.5; }
+
+.briefing-placeholder { display: flex; flex-direction: column; gap: 12px; padding: 32px 0 8px; min-height: 460px; color: var(--muted-foreground); font-size: 15px; line-height: 1.5; }
 .briefing-placeholder>svg { color: var(--primary); }
 .briefing-placeholder h3 { font-size: 22px; color: var(--foreground); }
-.briefing-section-preview { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 14px; border-top: 1px dashed var(--input); padding-top: 24px; margin-top: 16px; }
-.briefing-section-preview>span { display: flex; align-items: center; gap: 8px; font-size: 14px; }
-.briefing-section-preview>span:first-child { color: var(--success); }
-.briefing-sources { display: flex; flex-direction: column; gap: 6px; border-top: 1px dashed var(--input); padding-top: 18px; font-size: 14px; }
+.briefing-section-preview { list-style: none; margin: 16px 0 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
+.briefing-section-preview li { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; padding: 16px 18px; border: 1px dashed var(--input); border-radius: 8px; background: color-mix(in srgb, var(--muted) 35%, transparent); }
+.briefing-sources { display: flex; flex-direction: column; gap: 8px; border-top: 1px dashed var(--input); padding-top: 18px; font-size: 14px; }
 .briefing-sources h3 { font-family: var(--font-sans); font-size: 14px; font-weight: 600; }
-.briefing-sources a { font-size: 12px; color: var(--primary); overflow-wrap: anywhere; line-height: 1.6; }
+.briefing-sources ol { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.briefing-sources a { display: flex; align-items: baseline; gap: 10px; min-width: 0; color: var(--foreground); font-size: 14px; line-height: 1.5; text-decoration: none; }
+.briefing-sources a:hover .briefing-source-domain { color: var(--primary); text-decoration: underline; }
+.briefing-source-n { flex: none; min-width: 22px; color: var(--muted-foreground); font-size: 13px; }
+.briefing-source-domain { flex: none; font-weight: 500; }
+.briefing-source-path { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted-foreground); font-size: 12px; }
+.brief-cite { position: relative; display: inline-flex; align-items: center; justify-content: center; min-width: 20px; height: 20px; padding: 0 5px; margin: 0 1px 0 3px; border-radius: 999px; background: var(--tint); color: var(--primary); font-family: var(--font-mono); font-size: 11px; font-weight: 600; line-height: 1; text-decoration: none; vertical-align: 1px; }
+.brief-cite:hover, .brief-cite:focus-visible { background: var(--primary); color: var(--primary-foreground); }
+.brief-cite-domain { display: none; position: absolute; left: 0; bottom: calc(100% + 6px); z-index: 2; max-width: 240px; padding: 4px 8px; border-radius: 6px; background: var(--foreground); color: var(--background); font-family: var(--font-sans); font-size: 12px; font-weight: 500; line-height: 1.4; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: none; }
+.brief-cite:hover .brief-cite-domain, .brief-cite:focus-visible .brief-cite-domain { display: block; }
 .briefing-record-note { color: var(--muted-foreground); font-size: 12px; line-height: 1.5; }
 .briefing-live-steps { border-top: 1px dashed var(--input); padding-top: 18px; }
 .briefing-live-steps h3 { font-size: 17px; }
@@ -43,4 +56,4 @@
 .briefing-live-steps li { display: grid; grid-template-columns: 52px minmax(0,1fr); gap: 12px; font-size: 13px; line-height: 1.5; overflow-wrap: anywhere; }
 .briefing-live-steps .mono { color: var(--muted-foreground); font-size: 12px; }
 @media (max-width: 1000px) { .briefing-page { gap: 32px; } .briefing-form { max-width: none; } }
-@media (max-width: 640px) { .briefing-page { padding: 32px 0 64px; } .briefing-intro h1 { font-size: 32px; } .briefing-paper { padding: 24px 20px; } .briefing-paper-header h2 { font-size: 25px; } .briefing-output-section>h3 { font-size: 16px; } .briefing-section-preview { gap: 14px 8px; } .briefing-section-preview>span { font-size: 13px; } }
+@media (max-width: 640px) { .briefing-page { padding: 32px 0 64px; } .briefing-intro h1 { font-size: 32px; } .briefing-paper { padding: 24px 20px; } .briefing-paper-header h2 { font-size: 25px; } .briefing-output-section>h3 { font-size: 16px; } .briefing-placeholder { min-height: 0; } }

@@ -76,6 +76,12 @@ function playDemo(id: string, receive: (event: BatchEvent) => void, fail: (messa
     // Replaying the prefix is idempotent and covers a refresh between saving the
     // event cursor and React committing the corresponding session snapshot.
     for (let replay = 0; replay < index; replay++) receive(events[replay])
+    // Replay only: show every run starting and its first step at once, so rows are not "Starting" for the first second.
+    if (staticMode) {
+      const eager = records.length + records.filter(r => r.steps.length).length
+      while (index < eager) receive(events[index++])
+      demoPositions.set(id, index)
+    }
     const timer = window.setInterval(() => {
       if (index < events.length) receive(events[index++])
       demoPositions.set(id, index)

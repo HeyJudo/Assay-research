@@ -5,12 +5,12 @@ import { ArrowRight, BookOpen, CircleCheck, FileQuestion, LoaderCircle, ReceiptT
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { BriefText, LoadState, safeUrl } from '@/components/shared'
+import { BriefText, LoadState } from '@/components/shared'
 import { apiMode, data, sampleData, staticMode } from '@/lib/data'
 import { useData } from '@/lib/use-data'
 import { agentLabel, defaultWeights, money, percent, rankRows } from '@/lib/metrics'
 import { savedPasscode } from '@/lib/passcode'
-import { splitBriefing } from '@/lib/briefing-output'
+import { collectSources, sourceLabel, splitBriefing } from '@/lib/briefing-output'
 import type { RunRecord } from '@/types'
 import './briefing.css'
 
@@ -18,7 +18,9 @@ const sectionDescriptions: Record<string, string> = {
   verified: 'Backed by a quoted source',
   uncertain: 'One source, not confirmed',
   'not found': 'Looked for it, found nothing',
+  'open questions': 'Questions to ask in the meeting',
 }
+const previewSections = [{ name: 'Verified', icon: CircleCheck }, { name: 'Uncertain', icon: FileQuestion }, { name: 'Not found', icon: Search }, { name: 'Open questions', icon: BookOpen }]
 
 export default function Briefing() {
   const reduced = useReducedMotion()
@@ -52,7 +54,7 @@ export default function Briefing() {
   const promptOf = (taskId: string) => tasks.find(task => task.id === taskId)?.prompt ?? taskId
   const selectedRow = rows.find(row => row.agent_id === selected)
   const output = splitBriefing(run?.output.text ?? '')
-  const sources = [...new Set([...(run?.output.text.matchAll(/\[[^\]]+\]\((https?:\/\/[^)]+)\)/g) ?? [])].map(match => safeUrl(match[1])).concat((run?.claims ?? []).map(claim => safeUrl(claim.source_url))).filter((url): url is string => !!url))]
+  const sources = collectSources(run?.output.text ?? '', (run?.claims ?? []).map(claim => claim.source_url))
   const receiptParams = new URLSearchParams(params)
   if (run || pendingRun) receiptParams.set('run', run?.id ?? pendingRun)
   async function submit(e: React.FormEvent) {
@@ -100,14 +102,14 @@ export default function Briefing() {
       <p className="briefing-mode-note">{apiMode ? 'Researches the 30 days before your meeting with Tavily.' : staticMode ? 'Recorded output. No live searches or model calls.' : 'Sample output only. No live searches, model calls or provider spending.'}</p>
     </form>
     <article className="briefing-paper" aria-label="Meeting briefing" aria-busy={busy}>
-      <div className="briefing-paper-header"><div><h2>{output.title ?? (submittedSubject || 'Your meeting brief')}</h2><p className="mono">{submittedMeeting ? `meeting ${submittedMeeting.replace('T', ' · ')}` : 'Verified facts, uncertainty and open questions'}{run?.duration_s != null && ` · written in ${run.duration_s.toFixed(1)} s`}{run && ` · ${money(run.metrics.cost_usd)}`}</p></div>{(run || pendingRun) && <Button variant="outline" asChild><Link to={`?${receiptParams}`}><ReceiptText size={18} />Open the receipt</Link></Button>}</div>
+      <div className="briefing-paper-header"><div><h2>{output.title ?? (submittedSubject || 'Your meeting brief')}</h2><p className="briefing-meta">{submittedMeeting ? `Meeting ${submittedMeeting.replace('T', ' at ')}` : 'Verified facts, uncertainty and open questions'}{run?.duration_s != null && <> · written in <span className="mono">{run.duration_s.toFixed(1)} s</span></>}{run && <> · <span className="mono">{money(run.metrics.cost_usd)}</span></>}</p></div>{(run || pendingRun) && <Button variant="outline" asChild><Link to={`?${receiptParams}`}><ReceiptText size={18} />Open the receipt</Link></Button>}</div>
       {run && run.status !== 'running' && run.status !== 'done' && <p className="error-message" role="alert">{run.status === 'budget_exceeded' ? 'The agent reached its budget limit.' : 'The agent ended with an error.'} Review the receipt for details.</p>}
       {run && output.sections.length ? output.sections.map((section, index) => {
         const key = section.heading.toLowerCase()
-        return <motion.section className={`briefing-output-section briefing-output-${key.replaceAll(' ', '-')}`} key={`${section.heading}-${index}`} initial={reduced ? false : { opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ type: 'spring', bounce: 0, duration: .5, delay: reduced ? 0 : index * .12 }}>{section.heading && <h3>{sectionDescriptions[key] ? <><span className="briefing-section-badge">{section.heading}</span><span>{sectionDescriptions[key]}</span></> : section.heading === 'Open questions' ? 'Questions to ask in the meeting' : section.heading}</h3>}<BriefText text={section.text} /></motion.section>
-      }) : <div className="briefing-placeholder" role="status">{busy ? <><Search size={32} /><h3>Researching {submittedSubject}.</h3><p>Actual search and model steps appear as the agent records them.</p></> : <><BookOpen size={32} /><h3>{run ? 'The agent returned no briefing text.' : 'Your brief will appear here.'}</h3><p>{staticMode ? 'Pick a recorded brief, then click Show the recorded brief.' : 'Choose who you are meeting, then write a brief.'}</p></>}<div className="briefing-section-preview">{[{ name: 'Verified', icon: CircleCheck }, { name: 'Uncertain', icon: FileQuestion }, { name: 'Not found', icon: Search }, { name: 'Open questions', icon: BookOpen }].map(({ name, icon: Icon }) => <span key={name}><Icon size={16} />{name}</span>)}</div></div>}
+        return <motion.section className={`briefing-output-section briefing-output-${key.replaceAll(' ', '-')}`} key={`${section.heading}-${index}`} initial={reduced ? false : { opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ type: 'spring', bounce: 0, duration: .5, delay: reduced ? 0 : Math.min(index, 8) * .06 }}>{section.heading && <h3>{sectionDescriptions[key] ? <><span className="briefing-section-badge">{section.heading}</span><span>{sectionDescriptions[key]}</span></> : section.heading}</h3>}<BriefText text={section.text} sources={sources} /></motion.section>
+      }) : <div className="briefing-placeholder" role="status">{busy ? <><Search size={32} /><h3>Researching {submittedSubject}.</h3><p>Actual search and model steps appear as the agent records them.</p></> : <><BookOpen size={32} /><h3>{run ? 'The agent returned no briefing text.' : 'Your brief will appear here.'}</h3><p>{staticMode ? 'Pick a recorded brief, then click Show the recorded brief.' : 'Choose who you are meeting, then write a brief.'}</p></>}<ul className="briefing-section-preview" aria-label="Sections in the brief">{previewSections.map(({ name, icon: Icon }) => <li key={name}><span className="briefing-section-badge"><Icon size={14} />{name}</span><span>{sectionDescriptions[name.toLowerCase()]}</span></li>)}</ul></div>}
       {busy && run?.steps.length ? <section className="briefing-live-steps"><h3>Live research</h3><ol>{run.steps.map(step => <motion.li key={step.i} initial={reduced ? false : { opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ type: 'spring', bounce: 0 }}><span className="mono">{step.t.toFixed(1)}s</span><span><strong>{step.kind}</strong> {step.detail}</span></motion.li>)}</ol></section> : null}
-      {sources.length > 0 && <div className="briefing-sources"><h3>Sources</h3>{sources.map((url, index) => <a className="mono" href={url} key={url} target="_blank" rel="noreferrer">[{index + 1}] {url}</a>)}</div>}
+      {sources.length > 0 && <div className="briefing-sources"><h3>Sources</h3><ol>{sources.map((url, index) => { const { domain, path } = sourceLabel(url); return <li key={url}><a href={url} title={url} target="_blank" rel="noopener noreferrer"><span className="briefing-source-n mono">{index + 1}</span><span className="briefing-source-domain">{domain}</span>{path && <span className="briefing-source-path mono">{path}</span>}</a></li> })}</ol></div>}
       {run && <p className="briefing-record-note">{agentLabel(run.agent_id)} · {apiMode ? 'Live research record' : staticMode ? 'Recorded benchmark brief' : 'Sample output. No live facts were researched.'}</p>}
     </article>
   </div>

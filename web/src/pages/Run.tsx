@@ -239,13 +239,13 @@ export default function Run() {
         </div>
         <aside className="run-live-feed" aria-label={staticMode ? 'Recorded steps' : 'Live steps'}>
           <div><h2>{activeCell ? `Inside ${agentLabel(activeCell.agent_id)}, repeat ${activeCell.repeat}` : 'Inside the run'}</h2><p>Pick any row to watch it work.</p></div>
-          <ol>{activeCell?.steps.map(step => <motion.li className="run-feed-step" key={`${activeCell.run_id}-${step.i}`} initial={reduce ? false : { opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={reduce ? { duration: 0 } : spring}><StepChip step={step} /><div><strong>{step.kind === 'llm' && step.phase === 'plan' ? 'Planned its queries' : step.kind === 'llm' && step.phase === 'write' ? 'Drafted the brief' : step.kind === 'llm' && step.phase === 'check' ? 'Checked its claims' : stepNames[step.kind]}</strong><p>{step.detail}</p>{step.model && <span className="mono">{step.model}</span>}</div><time className="mono">{step.t.toFixed(1)}s</time></motion.li>)}</ol>
+          <ol>{activeCell?.steps.map(step => <motion.li layout className="run-feed-step" key={`${activeCell.run_id}-${step.i}`} initial={reduce ? false : { opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={reduce ? { duration: 0 } : spring}><StepChip step={step} /><div><strong>{step.kind === 'llm' && step.phase === 'plan' ? 'Planned its queries' : step.kind === 'llm' && step.phase === 'write' ? 'Drafted the brief' : step.kind === 'llm' && step.phase === 'check' ? 'Checked its claims' : stepNames[step.kind]}</strong><p>{step.detail}</p>{step.model && <span className="mono">{step.model}</span>}</div><time className="mono">{step.t.toFixed(1)}s</time></motion.li>)}</ol>
           {!activeCell?.steps.length && <p className="run-feed-empty">{staticMode ? 'Recorded steps appear here as the replay plays.' : 'Searches, page reads and model calls appear here as they happen.'}</p>}
           <div className="run-feed-cost"><span>This run so far</span><span className="mono">{money(activeCell ? runCost(activeCell) : 0)}</span></div>
           {activeCell?.done && <Button asChild variant="outline"><Link to={`?${new URLSearchParams({ batch, run: activeCell.run_id })}`}>Open receipt <ArrowRight size={15} /></Link></Button>}
         </aside>
       </div>
-      <p className="run-provenance">{apiMode ? 'Every agent uses the same frozen document pool. Costs are recorded at list prices.' : staticMode ? 'Replay of recorded benchmark runs. No live model calls or provider spending.' : 'Demo simulation. No live research or provider spending occurs.'}</p>
+      {!staticMode && <p className="run-provenance">{apiMode ? 'Every agent uses the same frozen document pool. Costs are recorded at list prices.' : 'Demo simulation. No live research or provider spending occurs.'}</p>}
     </div>
   }
 
