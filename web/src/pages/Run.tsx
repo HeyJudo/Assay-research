@@ -170,7 +170,8 @@ export default function Run() {
   const selected = draft.selected.filter(id => agents.some(agent => agent.id === id)).slice(0, 3)
   const recordedTrapIds = recorded.value ?? [null]
   const availableTraps = staticMode ? traps.filter(trap => recordedTrapIds.includes((trap.id || null) as Trap | null)) : traps.filter(trap => !['fake_article', 'hidden_instruction'].includes(trap.id) || actualTask?.id.endsWith('-trap'))
-  const actualTrap = availableTraps.find(trap => trap.id === draft.trap) ?? traps[0]
+  // Static mode may not record "No trap" for a trap task, so fall back to the first recorded trap.
+  const actualTrap = availableTraps.find(trap => trap.id === draft.trap) ?? availableTraps[0] ?? traps[0]
 
   async function start(event: React.FormEvent) {
     event.preventDefault()
