@@ -11,13 +11,15 @@ const M = marks as Record<'run' | 'receipt' | 'results' | 'briefing', Record<str
 
 export function RunScene() {
   const m = M.run, S = 'run' as const
+  // Agent list is on screen until ~7.3 s of the clip (Next clicked), not until m.task.
+  const agentsEnd = 7.3
   const task = w(S, 'meeting-brief') - 0.1, trap = w(S, 'trap') - 0.1, start = w(S, 'each') - 0.2, live = start + 0.8
   const cut = w(S, 'few') - 0.2, after = cut + 0.3
   return (
     <Screen clip="run" url="localhost · Assay / Run" step={0} enter
       segments={[
-        { from: 2, to: m.task - 0.3, at: 0, dur: task },
-        { from: m.task - 0.3, to: m.trap - 0.2, at: task, dur: trap - task },
+        { from: 2, to: agentsEnd, at: 0, dur: task },
+        { from: agentsEnd, to: m.trap - 0.2, at: task, dur: trap - task },
         { from: m.trap - 0.2, to: m.start + 0.4, at: trap, dur: start - trap },
         { from: m.start + 0.4, to: m.running + 0.5, at: start, dur: live - start },
         { from: m.running + 0.5, to: m.live, at: live, dur: after - live },
