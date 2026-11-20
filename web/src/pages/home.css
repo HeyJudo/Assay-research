@@ -35,9 +35,9 @@
 .home-method { gap: 40px; }
 .home-method h2 { text-align: center; }
 .home-method-track { height: 220vh; }
-.home-method-panel { position: sticky; top: 88px; display: flex; flex-direction: column; gap: 40px; }
-.home-method-caption { min-height: 72px; text-align: center; }
-.home-method-caption p { margin: 0 auto; max-width: 40ch; font-family: var(--font-heading); font-size: 26px; font-weight: 500; line-height: 1.25; letter-spacing: -.01em; }
+.home-method-panel { position: sticky; top: 64px; min-height: calc(100vh - 64px); padding: 24px 0 48px; display: flex; flex-direction: column; justify-content: center; gap: 56px; }  /* pinned stage fills the viewport under the header */
+.home-method-caption { min-height: 88px; text-align: center; }
+.home-method-caption p { margin: 0 auto; max-width: 40ch; font-family: var(--font-heading); font-size: 32px; font-weight: 500; line-height: 1.25; letter-spacing: -.01em; }
 .home-flow-fill { position: absolute; inset: 0; background: var(--primary); transform-origin: left; }
 .home-stations-wrap { position: relative; }
 .home-stations { list-style: none; display: grid; grid-template-columns: repeat(6,minmax(0,1fr)); gap: 8px; padding: 0; margin: 0; }
