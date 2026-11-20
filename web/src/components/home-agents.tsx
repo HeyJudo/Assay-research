@@ -73,7 +73,7 @@ const sponsors = [
 
 export function BuiltOn() {
   const reduced = useReducedMotion()
-  return <ul className="home-built" aria-label="Built on">{sponsors.map(({ name, role, icon: Icon, text }, index) => <motion.li key={name} initial={reduced ? false : { opacity: 0, y: 16 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, amount: .4 }} transition={{ type: 'spring', bounce: 0, duration: .6, delay: reduced ? 0 : index * .08 }}>
+  return <ul className="home-built" aria-label="Built on">{sponsors.map(({ name, role, icon: Icon, text }, index) => <motion.li key={name} initial={reduced ? false : { opacity: 0, y: 12 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, amount: .2, margin: '0px 0px -10% 0px' }} transition={{ type: 'spring', bounce: 0, duration: .45, delay: reduced ? 0 : index * .05 }}>
     <span className="home-built-icon"><Icon size={20} aria-hidden="true" /></span>
     <div><p className="home-built-name">{name}<small>{role}</small></p><p>{text}</p></div>
   </motion.li>)}</ul>

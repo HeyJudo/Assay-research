@@ -1,7 +1,6 @@
 import { useEffect } from 'react'
 import { BrowserRouter, HashRouter, Link, Navigate, NavLink, Route, Routes, useLocation, useParams } from 'react-router'
 import { MotionConfig } from 'motion/react'
-import { ReceiptText } from 'lucide-react'
 import Briefing from '@/pages/Briefing'
 import Results from '@/pages/Compare'
 import Home from '@/pages/Home'
@@ -39,7 +38,7 @@ function Shell() {
     <a className="skip-link" href="#main-content">Skip to content</a>
     <header className="app-topbar">
       <div className="app-topbar-inner">
-        <Link to="/" className="app-brand" aria-label="Assay home"><ReceiptText size={24} aria-hidden="true" />Assay</Link>
+        <Link to="/" className="app-brand" aria-label="Assay home"><img src={`${import.meta.env.BASE_URL}favicon.png`} width={24} height={24} alt="" />Assay</Link>
         <nav aria-label="Main navigation">{nav.map(({ to, label }) => <NavLink key={to} to={to} end aria-current={to === '/run' && pathname === '/results' ? 'page' : undefined} className={({ isActive }) => `app-navlink${isActive || to === '/run' && pathname === '/results' ? ' active' : ''}`}>{label}</NavLink>)}</nav>
         <span className="results-provenance">{sampleData ? 'Sample results' : 'Benchmark results'}</span>
       </div>
